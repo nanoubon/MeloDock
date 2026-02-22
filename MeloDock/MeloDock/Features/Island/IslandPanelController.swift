@@ -6,7 +6,7 @@ final class IslandPanelController {
     private enum Layout {
         static let width: CGFloat = 560
         static let height: CGFloat = 156
-        static let topPadding: CGFloat = 6
+        static let topPadding: CGFloat = 0
         static let horizontalPadding: CGFloat = 8
     }
 
@@ -29,7 +29,7 @@ final class IslandPanelController {
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.isMovable = false

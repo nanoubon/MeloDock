@@ -1,6 +1,17 @@
 import SwiftUI
 
 struct IslandView: View {
+    private enum Theme {
+        static let primaryText = Color.white.opacity(0.98)
+        static let secondaryText = Color.white.opacity(0.72)
+        static let panelTop = Color(red: 0.06, green: 0.06, blue: 0.07)
+        static let panelBottom = Color(red: 0.01, green: 0.01, blue: 0.01)
+        static let border = Color.white.opacity(0.07)
+        static let topShine = Color.white.opacity(0.05)
+        static let controlFill = Color.white.opacity(0.12)
+        static let cornerRadius: CGFloat = 24
+    }
+
     @ObservedObject var viewModel: IslandViewModel
 
     var body: some View {
@@ -28,7 +39,7 @@ struct IslandView: View {
 
                     Text(viewModel.trackArtist)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .lineLimit(1)
                 }
 
@@ -49,8 +60,14 @@ struct IslandView: View {
                     Button("Connect") {
                         viewModel.authorizeCurrentProvider()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
                     .controlSize(.small)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Theme.controlFill)
+                    )
                 }
             }
 
@@ -64,7 +81,7 @@ struct IslandView: View {
                 Text(viewModel.durationTimeText)
             }
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.secondaryText)
 
             HStack(spacing: 12) {
                 PlayerControlsView(
@@ -79,6 +96,7 @@ struct IslandView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "speaker.wave.2.fill")
                         .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
 
                     Slider(value: Binding(
                         get: { Double(viewModel.volume) },
@@ -106,14 +124,41 @@ struct IslandView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(width: 560, height: 156)
+        .foregroundStyle(Theme.primaryText)
+        .colorScheme(.dark)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Theme.panelTop, Theme.panelBottom],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .stroke(Theme.border, lineWidth: 1)
         )
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .stroke(Theme.topShine, lineWidth: 1)
+                .blur(radius: 0.4)
+                .mask(
+                    LinearGradient(
+                        colors: [.white, .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        }
+        .shadow(color: .black.opacity(0.55), radius: 18, x: 0, y: 9)
+        .overlay(alignment: .top) {
+            Capsule(style: .continuous)
+                .fill(Color.black.opacity(0.99))
+                .frame(width: 186, height: 16)
+                .offset(y: -8)
+        }
     }
 
     @ViewBuilder
@@ -139,10 +184,10 @@ struct IslandView: View {
 
     private var placeholderArtwork: some View {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(.white.opacity(0.12))
+            .fill(.white.opacity(0.08))
             .overlay(
                 Image(systemName: "music.note")
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(0.90))
             )
     }
 }
