@@ -12,6 +12,7 @@ final class SettingsViewModel: ObservableObject {
     @Published private(set) var spotifyAuthState: ProviderAuthState = .unknown
     @Published private(set) var launchAtLoginStatusText: String = "Unknown"
     @Published private(set) var isProUnlocked: Bool = false
+    @Published private(set) var statusInfoText: String?
     @Published private(set) var errorText: String?
 
     private let settingsStore: SettingsStore
@@ -106,6 +107,10 @@ final class SettingsViewModel: ObservableObject {
             .sink { [weak self] value in
                 self?.settingsStore.launchAtLogin = value
                 self?.launchAtLoginService.setEnabled(value)
+                if value == false {
+                    self?.statusInfoText = nil
+                    self?.errorText = nil
+                }
             }
             .store(in: &cancellables)
 
@@ -125,9 +130,21 @@ final class SettingsViewModel: ObservableObject {
             .store(in: &cancellables)
 
         launchAtLoginService.$lastError
-            .compactMap { $0 }
             .sink { [weak self] error in
-                self?.errorText = error
+                guard let self else { return }
+                guard let error else {
+                    self.statusInfoText = nil
+                    self.errorText = nil
+                    return
+                }
+
+                if self.isInformationalLaunchAtLoginMessage(error) {
+                    self.statusInfoText = error
+                    self.errorText = nil
+                } else {
+                    self.statusInfoText = nil
+                    self.errorText = error
+                }
             }
             .store(in: &cancellables)
 
@@ -153,5 +170,14 @@ final class SettingsViewModel: ObservableObject {
     private func refreshProviderStates() async {
         await musicProviders[.appleMusic]?.refreshNowPlaying()
         await musicProviders[.spotify]?.refreshNowPlaying()
+    }
+
+    private func isInformationalLaunchAtLoginMessage(_ message: String) -> Bool {
+        let normalized = message.lowercased()
+        return normalized.contains("launch at login")
+            && (normalized.contains("debug")
+                || normalized.contains("signed")
+                || normalized.contains("/applications")
+                || normalized.contains("operation not permitted"))
     }
 }

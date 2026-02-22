@@ -5,6 +5,7 @@ struct Track: Identifiable, Equatable, Codable {
     let title: String
     let artist: String
     let artworkURL: URL?
+    let tempoBPM: Double?
     let duration: TimeInterval
     var progress: TimeInterval
 
@@ -13,6 +14,7 @@ struct Track: Identifiable, Equatable, Codable {
         title: String,
         artist: String,
         artworkURL: URL?,
+        tempoBPM: Double? = nil,
         duration: TimeInterval,
         progress: TimeInterval
     ) {
@@ -20,6 +22,11 @@ struct Track: Identifiable, Equatable, Codable {
         self.title = title
         self.artist = artist
         self.artworkURL = artworkURL
+        if let tempoBPM, tempoBPM > 0 {
+            self.tempoBPM = min(tempoBPM, 260)
+        } else {
+            self.tempoBPM = nil
+        }
         self.duration = max(0, duration)
         self.progress = max(0, min(progress, max(0, duration)))
     }

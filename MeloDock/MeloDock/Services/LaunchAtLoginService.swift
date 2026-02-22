@@ -19,7 +19,7 @@ final class LaunchAtLoginService: ObservableObject {
             }
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            lastError = friendlyErrorMessage(for: error)
         }
 
         refresh()
@@ -27,5 +27,20 @@ final class LaunchAtLoginService: ObservableObject {
 
     func refresh() {
         isEnabled = SMAppService.mainApp.status == .enabled
+    }
+
+    private func friendlyErrorMessage(for error: Error) -> String {
+        let nsError = error as NSError
+        let message = nsError.localizedDescription
+
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(EPERM) {
+            return "Launch at Login ถูกบล็อกในโหมด Debug. ฟีเจอร์นี้จะทำงานเมื่อรันแอพที่ signed และอยู่ใน /Applications."
+        }
+
+        if message.localizedCaseInsensitiveContains("operation not permitted") {
+            return "ไม่สามารถเปิด Launch at Login ได้ในสภาพแวดล้อมปัจจุบัน. โปรดรันแอพแบบ signed จาก /Applications."
+        }
+
+        return message
     }
 }

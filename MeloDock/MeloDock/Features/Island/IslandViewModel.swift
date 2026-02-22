@@ -6,6 +6,7 @@ final class IslandViewModel: ObservableObject {
     @Published private(set) var playbackState: PlaybackState
     @Published private(set) var authState: ProviderAuthState = .unknown
     @Published private(set) var outputs: [AudioOutput] = []
+    @Published private(set) var liveProgress: TimeInterval = 0
     @Published var volume: Float = 0.5
     @Published var selectedOutputID: String = ""
     @Published var selectedProvider: MusicProviderKind
@@ -17,6 +18,11 @@ final class IslandViewModel: ObservableObject {
     private var providerCancellables = Set<AnyCancellable>()
     private var cancellables = Set<AnyCancellable>()
     private var pollCancellable: AnyCancellable?
+    private var progressTickCancellable: AnyCancellable?
+    private var isRefreshing = false
+    private var hiddenTickCounter = 0
+    private var lastAudioRefreshAt = Date.distantPast
+    private var lastProgressTickAt = Date()
 
     init(
         settingsStore: SettingsStore,
@@ -35,26 +41,69 @@ final class IslandViewModel: ObservableObject {
         bindAudio()
         switchProvider(to: initialProvider)
         startPolling()
+        startProgressTicker()
     }
 
     func bootstrap() async {
-        await refresh()
+        await refresh(forceAudioRefresh: true)
     }
 
     var trackTitle: String {
-        playbackState.track?.title ?? "Nothing Playing"
+        if let title = displayMetadata(playbackState.track?.title), title.isEmpty == false {
+            return title
+        }
+        return playbackState.isPlaying ? "Now Playing" : "Nothing Playing"
     }
 
     var trackArtist: String {
-        playbackState.track?.artist ?? (playbackState.message ?? "Open Apple Music or Spotify")
+        if let artist = displayMetadata(playbackState.track?.artist), artist.isEmpty == false {
+            return artist
+        }
+        return playbackState.message ?? "Open Apple Music or Spotify"
     }
 
     var progressFraction: Double {
-        playbackState.track?.progressFraction ?? 0
+        if let duration = playbackState.track?.duration, duration > 0 {
+            return min(max(liveProgress / duration, 0), 1)
+        }
+        guard playbackState.isPlaying else { return 0 }
+        let cycle = liveProgress.truncatingRemainder(dividingBy: 20)
+        return cycle / 20
     }
 
     var artworkURL: URL? {
         playbackState.track?.artworkURL
+    }
+
+    var shouldShowSpectrum: Bool {
+        playbackState.isPlaying || playbackState.track != nil
+    }
+
+    var spectrumProgress: TimeInterval {
+        liveProgress
+    }
+
+    var spectrumTempoBPM: Double {
+        if let tempo = playbackState.track?.tempoBPM, tempo > 0 {
+            return tempo
+        }
+        return 120
+    }
+
+    var elapsedTimeText: String {
+        formatTime(liveProgress)
+    }
+
+    var durationTimeText: String {
+        guard let duration = playbackState.track?.duration, duration > 0 else { return "--:--" }
+        return formatTime(duration)
+    }
+
+    var spectrumSeed: Int {
+        guard let id = playbackState.track?.id else { return 17 }
+        return id.unicodeScalars.reduce(17) { partialResult, scalar in
+            (partialResult &* 31) &+ Int(scalar.value)
+        }
     }
 
     func setProvider(_ provider: MusicProviderKind) {
@@ -119,6 +168,14 @@ final class IslandViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        settingsStore.$overlayVisible
+            .removeDuplicates()
+            .sink { [weak self] isVisible in
+                guard isVisible else { return }
+                Task { await self?.refresh(forceAudioRefresh: true) }
+            }
+            .store(in: &cancellables)
     }
 
     private func bindAudio() {
@@ -144,7 +201,7 @@ final class IslandViewModel: ObservableObject {
         providerInstance.playbackStatePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
-                self?.playbackState = state
+                self?.handlePlaybackStateUpdate(state)
             }
             .store(in: &providerCancellables)
 
@@ -160,12 +217,109 @@ final class IslandViewModel: ObservableObject {
         pollCancellable = Timer.publish(every: 2.0, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                Task { await self?.refresh() }
+                guard let self else { return }
+
+                if self.settingsStore.overlayVisible == false {
+                    self.hiddenTickCounter += 1
+                    if self.hiddenTickCounter % 3 != 0 {
+                        return
+                    }
+                } else {
+                    self.hiddenTickCounter = 0
+                }
+
+                Task { await self.refresh() }
             }
     }
 
-    private func refresh() async {
+    private func startProgressTicker() {
+        progressTickCancellable = Timer.publish(every: 1.0 / 15.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.advanceLiveProgress()
+            }
+    }
+
+    private func handlePlaybackStateUpdate(_ state: PlaybackState) {
+        var normalizedState = state
+        if normalizedState.track == nil,
+           (normalizedState.status == .playing || normalizedState.status == .paused),
+           let previousTrack = playbackState.track {
+            normalizedState.track = previousTrack
+        }
+
+        let previousTrackID = playbackState.track?.id
+        let previousProgress = liveProgress
+        playbackState = normalizedState
+
+        if let track = normalizedState.track {
+            if normalizedState.isPlaying, previousTrackID == track.id {
+                // Prevent stutter when provider reports slightly stale progress.
+                liveProgress = max(previousProgress, track.progress)
+            } else {
+                liveProgress = track.progress
+            }
+        } else {
+            liveProgress = 0
+        }
+
+        lastProgressTickAt = Date()
+    }
+
+    private func advanceLiveProgress() {
+        guard playbackState.isPlaying else {
+            lastProgressTickAt = Date()
+            return
+        }
+
+        let now = Date()
+        let delta = now.timeIntervalSince(lastProgressTickAt)
+        guard delta > 0 else { return }
+
+        if let duration = playbackState.track?.duration, duration > 0 {
+            liveProgress = min(duration, liveProgress + delta)
+        } else {
+            liveProgress += delta
+        }
+        lastProgressTickAt = now
+    }
+
+    private func refresh(forceAudioRefresh: Bool = false) async {
+        guard isRefreshing == false else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         await activeProvider?.refreshNowPlaying()
-        await audioDeviceProvider.refresh()
+
+        let now = Date()
+        let shouldRefreshAudio = forceAudioRefresh || now.timeIntervalSince(lastAudioRefreshAt) >= 8.0
+        if shouldRefreshAudio {
+            await audioDeviceProvider.refresh()
+            lastAudioRefreshAt = now
+        }
+    }
+
+    private func displayMetadata(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return nil }
+
+        let normalized = trimmed.lowercased()
+        if normalized == "missing value"
+            || normalized == "missingvalue"
+            || normalized == "(null)"
+            || normalized == "<null>"
+            || normalized == "nil" {
+            return nil
+        }
+
+        return trimmed
+    }
+
+    private func formatTime(_ value: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(value.rounded(.down)))
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }

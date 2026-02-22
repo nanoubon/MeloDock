@@ -8,10 +8,24 @@ struct IslandView: View {
             HStack(spacing: 12) {
                 artworkView
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.trackTitle)
-                        .font(.headline)
-                        .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(viewModel.trackTitle)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+
+                        if viewModel.shouldShowSpectrum {
+                            MusicSpectrumView(
+                                isActive: viewModel.playbackState.isPlaying,
+                                seed: viewModel.spectrumSeed,
+                                progress: viewModel.spectrumProgress,
+                                tempoBPM: viewModel.spectrumTempoBPM
+                            )
+                            .frame(width: 76)
+                        }
+                    }
+
                     Text(viewModel.trackArtist)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -43,6 +57,14 @@ struct IslandView: View {
             ProgressView(value: viewModel.progressFraction)
                 .progressViewStyle(.linear)
                 .tint(.white.opacity(0.9))
+
+            HStack {
+                Text(viewModel.elapsedTimeText)
+                Spacer()
+                Text(viewModel.durationTimeText)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
                 PlayerControlsView(
@@ -83,7 +105,7 @@ struct IslandView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .frame(width: 560, height: 140)
+        .frame(width: 560, height: 156)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(.ultraThinMaterial)

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureStatusItem()
         configureHotkey()
         configureLaunchAtLoginSync()
+        configureNotificationActions()
 
         Task { await container.islandViewModel.bootstrap() }
 
@@ -77,8 +78,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
     }
 
+    private func configureNotificationActions() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleToggleOverlayNotification(_:)),
+            name: .meloDockToggleOverlay,
+            object: nil
+        )
+    }
+
     @objc private func toggleOverlay(_ sender: Any?) {
         panelController?.toggle()
+    }
+
+    @objc private func handleToggleOverlayNotification(_ notification: Notification) {
+        toggleOverlay(nil)
     }
 
     @objc private func openSettings(_ sender: Any?) {
@@ -89,4 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quitApp(_ sender: Any?) {
         NSApp.terminate(nil)
     }
+}
+
+extension Notification.Name {
+    static let meloDockToggleOverlay = Notification.Name("com.nano.melodock.toggle-overlay")
 }

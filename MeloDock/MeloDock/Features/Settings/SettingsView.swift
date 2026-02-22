@@ -13,6 +13,9 @@ struct SettingsView: View {
                 }
 
                 Toggle("Show Overlay on Launch", isOn: $viewModel.showOnStartup)
+                Button("Show/Hide Overlay Now") {
+                    NotificationCenter.default.post(name: .meloDockToggleOverlay, object: nil)
+                }
                 Toggle("Launch at Login", isOn: $viewModel.launchAtLogin)
                 Text("Login Item Status: \(viewModel.launchAtLoginStatusText)")
                     .font(.caption)
@@ -41,6 +44,12 @@ struct SettingsView: View {
 
             Section("Hotkey") {
                 Text("Current global hotkey: \(viewModel.hotkeyDescription)")
+                Text("Tip: Press \(viewModel.hotkeyDescription) to show/hide overlay.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Toggle Overlay Now") {
+                    NotificationCenter.default.post(name: .meloDockToggleOverlay, object: nil)
+                }
                 Button("Reset to Option+Command+M") {
                     viewModel.resetHotkey()
                 }
@@ -50,6 +59,13 @@ struct SettingsView: View {
                 Text(viewModel.isProUnlocked ? "Pro unlocked." : "Free tier active.")
                 Button("Refresh Purchase Status") {
                     viewModel.refreshProStatus()
+                }
+            }
+
+            if let infoText = viewModel.statusInfoText {
+                Section("Info") {
+                    Text(infoText)
+                        .foregroundStyle(.secondary)
                 }
             }
 
