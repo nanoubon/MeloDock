@@ -1,164 +1,244 @@
 import SwiftUI
 
 struct IslandView: View {
+    private enum Layout {
+        static let panelWidth: CGFloat = 612
+        static let panelHeight: CGFloat = 176
+        static let cornerRadius: CGFloat = 26
+        static let outerPadding: CGFloat = 16
+        static let blockSpacing: CGFloat = 10
+        static let compactSpacing: CGFloat = 8
+        static let controlHeight: CGFloat = 40
+        static let albumSize: CGFloat = 60
+        static let titleSize: CGFloat = 17
+        static let subtitleSize: CGFloat = 13
+        static let spectrumWidth: CGFloat = 72
+    }
+
     private enum Theme {
-        static let primaryText = Color.white.opacity(0.98)
-        static let secondaryText = Color.white.opacity(0.72)
-        static let panelTop = Color(red: 0.06, green: 0.06, blue: 0.07)
-        static let panelBottom = Color(red: 0.01, green: 0.01, blue: 0.01)
-        static let border = Color.white.opacity(0.07)
-        static let topShine = Color.white.opacity(0.05)
-        static let controlFill = Color.white.opacity(0.12)
-        static let cornerRadius: CGFloat = 24
+        static let textPrimary = Color.white.opacity(0.98)
+        static let textSecondary = Color.white.opacity(0.76)
+        static let textTertiary = Color.white.opacity(0.54)
+        static let panelTop = Color(red: 0.07, green: 0.08, blue: 0.10)
+        static let panelBottom = Color(red: 0.01, green: 0.01, blue: 0.02)
+        static let panelBorder = Color.white.opacity(0.08)
+        static let panelGlow = Color(red: 0.53, green: 0.74, blue: 1.0).opacity(0.20)
+        static let fieldFill = Color.white.opacity(0.09)
+        static let fieldStroke = Color.white.opacity(0.13)
+        static let progressTrack = Color.white.opacity(0.16)
+        static let progressFill = Color.white.opacity(0.92)
+        static let scrubber = Color.white
     }
 
     @ObservedObject var viewModel: IslandViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                artworkView
+        VStack(alignment: .leading, spacing: Layout.blockSpacing) {
+            topRow
+            progressSection
+            bottomRow
+        }
+        .padding(.horizontal, Layout.outerPadding)
+        .padding(.vertical, Layout.outerPadding)
+        .frame(width: Layout.panelWidth, height: Layout.panelHeight)
+        .foregroundStyle(Theme.textPrimary)
+        .colorScheme(.dark)
+        .background(panelBackground)
+        .clipShape(panelShape, style: FillStyle(eoFill: false, antialiased: true))
+        .overlay(panelBorderOverlay)
+        .overlay(panelGlowOverlay)
+    }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(viewModel.trackTitle)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .layoutPriority(1)
+    private var topRow: some View {
+        HStack(spacing: Layout.blockSpacing) {
+            artworkView
+                .frame(width: Layout.albumSize, height: Layout.albumSize)
 
-                        if viewModel.shouldShowSpectrum {
-                            MusicSpectrumView(
-                                isActive: viewModel.playbackState.isPlaying,
-                                seed: viewModel.spectrumSeed,
-                                progress: viewModel.spectrumProgress,
-                                tempoBPM: viewModel.spectrumTempoBPM
-                            )
-                            .frame(width: 76)
-                        }
-                    }
-
-                    Text(viewModel.trackArtist)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondaryText)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(viewModel.trackTitle)
+                        .font(.system(size: Layout.titleSize, weight: .semibold))
                         .lineLimit(1)
-                }
+                        .layoutPriority(1)
 
-                Spacer()
-
-                Picker("", selection: Binding(
-                    get: { viewModel.selectedProvider },
-                    set: { viewModel.setProvider($0) }
-                )) {
-                    ForEach(MusicProviderKind.allCases) { provider in
-                        Text(provider.displayName).tag(provider)
+                    if viewModel.shouldShowSpectrum {
+                        MusicSpectrumView(
+                            isActive: viewModel.playbackState.isPlaying,
+                            seed: viewModel.spectrumSeed,
+                            progress: viewModel.spectrumProgress,
+                            tempoBPM: viewModel.spectrumTempoBPM
+                        )
+                        .frame(width: Layout.spectrumWidth)
+                        .offset(y: 1)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
 
+                Text(viewModel.trackArtist)
+                    .font(.system(size: Layout.subtitleSize, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: Layout.compactSpacing)
+
+            HStack(spacing: Layout.compactSpacing) {
+                sourcePicker
                 if viewModel.authState != .authorized {
                     Button("Connect") {
                         viewModel.authorizeCurrentProvider()
                     }
                     .buttonStyle(.plain)
-                    .controlSize(.small)
+                    .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Theme.controlFill)
-                    )
+                    .frame(height: Layout.controlHeight)
+                    .background(fieldCapsule())
                 }
             }
+        }
+    }
 
-            ProgressView(value: viewModel.progressFraction)
-                .progressViewStyle(.linear)
-                .tint(.white.opacity(0.9))
+    private var sourcePicker: some View {
+        Picker("", selection: Binding(
+            get: { viewModel.selectedProvider },
+            set: { viewModel.setProvider($0) }
+        )) {
+            ForEach(MusicProviderKind.allCases) { provider in
+                Text(provider.displayName).tag(provider)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .font(.system(size: 13, weight: .semibold))
+        .padding(.horizontal, 12)
+        .frame(minWidth: 168)
+        .frame(height: Layout.controlHeight)
+        .background(fieldCapsule())
+    }
+
+    private var progressSection: some View {
+        VStack(spacing: 6) {
+            progressBar
 
             HStack {
                 Text(viewModel.elapsedTimeText)
                 Spacer()
                 Text(viewModel.durationTimeText)
             }
-            .font(.caption2)
-            .foregroundStyle(Theme.secondaryText)
+            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(Theme.textTertiary)
+        }
+    }
 
-            HStack(spacing: 12) {
-                PlayerControlsView(
-                    isPlaying: viewModel.playbackState.isPlaying,
-                    onPrevious: { viewModel.playPrevious() },
-                    onPlayPause: { viewModel.togglePlayPause() },
-                    onNext: { viewModel.playNext() }
-                )
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let progress = min(max(CGFloat(viewModel.progressFraction), 0), 1)
+            let filledWidth = progress > 0 ? max(8, width * progress) : 0
+            let knobX = min(max(5.5, width * progress), width - 5.5)
 
-                Spacer()
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(Theme.progressTrack)
+                    .frame(height: 5)
 
-                HStack(spacing: 8) {
-                    Image(systemName: "speaker.wave.2.fill")
-                        .font(.caption)
-                        .foregroundStyle(Theme.secondaryText)
+                Capsule(style: .continuous)
+                    .fill(Theme.progressFill)
+                    .frame(width: filledWidth, height: 5)
 
-                    Slider(value: Binding(
-                        get: { Double(viewModel.volume) },
-                        set: { viewModel.setVolume(Float($0)) }
-                    ), in: 0...1)
-                    .frame(width: 130)
+                Circle()
+                    .fill(Theme.scrubber)
+                    .frame(width: 11, height: 11)
+                    .shadow(color: .black.opacity(0.32), radius: 2.2, x: 0, y: 1)
+                    .offset(x: knobX - 5.5)
+            }
+        }
+        .frame(height: 10)
+    }
 
-                    Picker("", selection: Binding(
-                        get: { viewModel.selectedOutputID },
-                        set: { viewModel.chooseOutput($0) }
-                    )) {
-                        if viewModel.outputs.isEmpty {
-                            Text("No Outputs").tag("")
-                        } else {
-                            ForEach(viewModel.outputs) { output in
-                                Text(output.name).tag(output.id)
-                            }
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 170)
+    private var bottomRow: some View {
+        HStack(spacing: Layout.blockSpacing) {
+            PlayerControlsView(
+                isPlaying: viewModel.playbackState.isPlaying,
+                onPrevious: { viewModel.playPrevious() },
+                onPlayPause: { viewModel.togglePlayPause() },
+                onNext: { viewModel.playNext() }
+            )
+
+            Spacer(minLength: Layout.compactSpacing)
+
+            volumeCluster
+            outputPicker
+        }
+    }
+
+    private var volumeCluster: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "speaker.wave.2.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+
+            Slider(value: Binding(
+                get: { Double(viewModel.volume) },
+                set: { viewModel.setVolume(Float($0)) }
+            ), in: 0...1)
+            .tint(.white.opacity(0.9))
+            .frame(width: 150)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: Layout.controlHeight)
+        .background(fieldCapsule())
+    }
+
+    private var outputPicker: some View {
+        Picker("", selection: Binding(
+            get: { viewModel.selectedOutputID },
+            set: { viewModel.chooseOutput($0) }
+        )) {
+            if viewModel.outputs.isEmpty {
+                Text("No Outputs").tag("")
+            } else {
+                ForEach(viewModel.outputs) { output in
+                    Text(output.name).tag(output.id)
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(width: 560, height: 156)
-        .foregroundStyle(Theme.primaryText)
-        .colorScheme(.dark)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Theme.panelTop, Theme.panelBottom],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .font(.system(size: 13, weight: .semibold))
+        .padding(.horizontal, 12)
+        .frame(width: 192, height: Layout.controlHeight)
+        .background(fieldCapsule())
+    }
+
+    private var panelBackground: some View {
+        panelShape
+            .fill(
+                LinearGradient(
+                    colors: [Theme.panelTop, Theme.panelBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Theme.border, lineWidth: 1)
-        )
-        .overlay(alignment: .top) {
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Theme.topShine, lineWidth: 1)
-                .blur(radius: 0.4)
-                .mask(
-                    LinearGradient(
-                        colors: [.white, .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-        }
-        .shadow(color: .black.opacity(0.55), radius: 18, x: 0, y: 9)
-        .overlay(alignment: .top) {
-            Capsule(style: .continuous)
-                .fill(Color.black.opacity(0.99))
-                .frame(width: 186, height: 16)
-                .offset(y: -8)
-        }
+            )
+    }
+
+    private var panelBorderOverlay: some View {
+        panelShape
+            .strokeBorder(Theme.panelBorder, lineWidth: 1, antialiased: true)
+    }
+
+    private var panelGlowOverlay: some View {
+        panelShape
+            .strokeBorder(Theme.panelGlow.opacity(0.7), lineWidth: 1, antialiased: true)
+    }
+
+    private func fieldCapsule() -> some View {
+        Capsule(style: .continuous)
+            .fill(Theme.fieldFill)
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(Theme.fieldStroke, lineWidth: 1, antialiased: true)
+            )
     }
 
     @ViewBuilder
@@ -174,20 +254,27 @@ struct IslandView: View {
                     placeholderArtwork
                 }
             }
-            .frame(width: 54, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         } else {
             placeholderArtwork
-                .frame(width: 54, height: 54)
         }
     }
 
     private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(.white.opacity(0.08))
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.white.opacity(0.11))
             .overlay(
                 Image(systemName: "music.note")
-                    .foregroundStyle(.white.opacity(0.90))
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.88))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1, antialiased: true)
+            )
+    }
+
+    private var panelShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
     }
 }

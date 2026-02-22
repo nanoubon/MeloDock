@@ -251,8 +251,9 @@ final class AppleMusicProvider: MusicProvider {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            let userInfo = notification.userInfo
             Task { @MainActor [weak self] in
-                self?.consumeDistributedPlayerInfo(notification.userInfo)
+                self?.consumeDistributedPlayerInfo(userInfo)
             }
         }
     }

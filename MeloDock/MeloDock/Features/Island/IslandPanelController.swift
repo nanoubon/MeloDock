@@ -1,12 +1,14 @@
 import AppKit
 import CoreGraphics
+import QuartzCore
 import SwiftUI
 
 final class IslandPanelController {
     private enum Layout {
-        static let width: CGFloat = 560
-        static let height: CGFloat = 156
-        static let topPadding: CGFloat = 0
+        static let width: CGFloat = 612
+        static let height: CGFloat = 176
+        static let cornerRadius: CGFloat = 26
+        static let topPadding: CGFloat = 2
         static let horizontalPadding: CGFloat = 8
     }
 
@@ -37,7 +39,15 @@ final class IslandPanelController {
         panel.titlebarAppearsTransparent = true
         panel.becomesKeyOnlyIfNeeded = true
         panel.animationBehavior = .utilityWindow
+        panel.isMovableByWindowBackground = false
         panel.contentViewController = hostingController
+
+        if let contentView = panel.contentView {
+            configureLayerClipping(for: contentView)
+        }
+
+        configureLayerClipping(for: hostingController.view)
+        applyShapeMask()
 
         NotificationCenter.default.addObserver(
             self,
@@ -62,6 +72,7 @@ final class IslandPanelController {
     func show() {
         panel.orderFrontRegardless()
         reposition()
+        applyShapeMask()
 
         // First launch can report stale geometry; re-apply centering on next runloop ticks.
         if didApplyInitialShowReposition == false {
@@ -69,9 +80,11 @@ final class IslandPanelController {
 
             DispatchQueue.main.async { [weak self] in
                 self?.reposition()
+                self?.applyShapeMask()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
                 self?.reposition()
+                self?.applyShapeMask()
             }
         }
 
@@ -106,6 +119,53 @@ final class IslandPanelController {
         let topReference = notchCenter != nil ? screen.frame.maxY : screen.visibleFrame.maxY
         let y = topReference - panelHeight - Layout.topPadding
         panel.setFrameOrigin(NSPoint(x: x, y: y))
+        applyShapeMask()
+    }
+
+    private func configureLayerClipping(for view: NSView) {
+        view.wantsLayer = true
+        guard let layer = view.layer else { return }
+
+        layer.backgroundColor = NSColor.clear.cgColor
+        layer.masksToBounds = true
+        layer.cornerRadius = Layout.cornerRadius
+        if #available(macOS 10.15, *) {
+            layer.cornerCurve = .continuous
+        }
+        layer.allowsEdgeAntialiasing = true
+    }
+
+    private func applyShapeMask() {
+        guard let contentView = panel.contentView,
+              let contentLayer = contentView.layer,
+              let hostingLayer = hostingController.view.layer else {
+            return
+        }
+
+        let bounds = contentView.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return }
+
+        let insetBounds = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let path = CGPath(
+            roundedRect: insetBounds,
+            cornerWidth: Layout.cornerRadius,
+            cornerHeight: Layout.cornerRadius,
+            transform: nil
+        )
+
+        let contentMask = CAShapeLayer()
+        contentMask.frame = bounds
+        contentMask.path = path
+        contentMask.fillColor = NSColor.black.cgColor
+        contentMask.contentsScale = panel.backingScaleFactor
+        contentLayer.mask = contentMask
+
+        let hostingMask = CAShapeLayer()
+        hostingMask.frame = bounds
+        hostingMask.path = path
+        hostingMask.fillColor = NSColor.black.cgColor
+        hostingMask.contentsScale = panel.backingScaleFactor
+        hostingLayer.mask = hostingMask
     }
 
     private func preferredScreen() -> NSScreen? {

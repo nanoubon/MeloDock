@@ -8,9 +8,9 @@ struct MusicSpectrumView: View {
 
     private enum Layout {
         static let barCount = 14
-        static let barWidth: CGFloat = 3
-        static let barHeight: CGFloat = 14
-        static let spacing: CGFloat = 3
+        static let barWidth: CGFloat = 2.8
+        static let barHeight: CGFloat = 12
+        static let spacing: CGFloat = 2.4
         static let minScale: CGFloat = 0.18
         static let maxScale: CGFloat = 1.0
     }
@@ -33,7 +33,7 @@ struct MusicSpectrumView: View {
         HStack(alignment: .bottom, spacing: Layout.spacing) {
             ForEach(0..<Layout.barCount, id: \.self) { index in
                 Capsule(style: .continuous)
-                    .fill(.white.opacity(active ? 0.92 : 0.34))
+                    .fill(barGradient(for: index, active: active))
                     .frame(width: Layout.barWidth, height: Layout.barHeight)
                     .scaleEffect(
                         x: 1,
@@ -43,6 +43,34 @@ struct MusicSpectrumView: View {
             }
         }
         .frame(height: Layout.barHeight, alignment: .bottom)
+    }
+
+    private func barGradient(for index: Int, active: Bool) -> LinearGradient {
+        let ratio = Double(index) / Double(max(Layout.barCount - 1, 1))
+
+        if active {
+            let startHue = 0.58 - (ratio * 0.14)
+            let endHue = startHue - 0.03
+
+            let top = Color(
+                hue: startHue,
+                saturation: 0.36 + (ratio * 0.20),
+                brightness: 0.98,
+                opacity: 0.98
+            )
+            let bottom = Color(
+                hue: endHue,
+                saturation: 0.48 + (ratio * 0.22),
+                brightness: 0.82,
+                opacity: 0.92
+            )
+
+            return LinearGradient(colors: [top, bottom], startPoint: .top, endPoint: .bottom)
+        }
+
+        let mutedTop = Color.white.opacity(0.40)
+        let mutedBottom = Color.white.opacity(0.24)
+        return LinearGradient(colors: [mutedTop, mutedBottom], startPoint: .top, endPoint: .bottom)
     }
 
     private func scale(for index: Int, at time: TimeInterval) -> CGFloat {
