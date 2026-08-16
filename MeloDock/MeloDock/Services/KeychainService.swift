@@ -20,7 +20,10 @@ final class KeychainService {
         }
 
         if addStatus == errSecDuplicateItem {
-            let attributesToUpdate = [kSecValueData as String: data]
+            let attributesToUpdate: [String: Any] = [
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            ]
             let updateStatus = SecItemUpdate(
                 baseQuery(for: key) as CFDictionary,
                 attributesToUpdate as CFDictionary

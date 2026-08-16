@@ -134,7 +134,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
                 }
 
                 return Track(
-                    id: item.id ?? UUID().uuidString,
+                    id: item.id ?? "\(item.name)|\(item.duration_ms)",
                     title: item.name,
                     artist: artist,
                     artworkURL: artworkURL.flatMap(URL.init(string:)),
@@ -254,31 +254,33 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
 
     private func handleAuthCallback(url: URL) async {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            authSubject.send(.unavailable("Invalid Spotify callback URL."))
+            failPendingAuth("Invalid Spotify callback URL.")
             return
         }
 
         let query = HTTPFormCoding.queryDictionary(from: components.queryItems)
 
         if let returnedError = query["error"] {
-            authSubject.send(.unavailable("Spotify auth failed: \(returnedError)"))
+            failPendingAuth("Spotify auth failed: \(returnedError)")
             return
         }
 
         guard let code = query["code"], !code.isEmpty else {
-            authSubject.send(.unavailable("Spotify auth code was missing."))
+            failPendingAuth("Spotify auth code was missing.")
             return
         }
 
-        guard let state = query["state"], state == pendingState else {
-            authSubject.send(.unavailable("Spotify auth state mismatch."))
+        guard let expectedState = pendingState, let verifier = pendingCodeVerifier else {
+            // Duplicate callback after ASWebAuthenticationSession and application(_:open:).
             return
         }
 
-        guard let verifier = pendingCodeVerifier else {
-            authSubject.send(.unavailable("PKCE verifier missing."))
+        guard let state = query["state"], state == expectedState else {
+            failPendingAuth("Spotify auth state mismatch.")
             return
         }
+
+        clearPendingAuth()
 
         do {
             let token = try await exchangeCodeForToken(code: code, verifier: verifier)
@@ -288,7 +290,15 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         } catch {
             authSubject.send(.unavailable("Token exchange failed: \(error.localizedDescription)"))
         }
+    }
 
+    private func failPendingAuth(_ message: String) {
+        guard pendingCodeVerifier != nil || pendingState != nil else { return }
+        clearPendingAuth()
+        authSubject.send(.unavailable(message))
+    }
+
+    private func clearPendingAuth() {
         pendingCodeVerifier = nil
         pendingState = nil
     }

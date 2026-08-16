@@ -49,7 +49,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     func bootstrap() async {
-        await refresh(forceAudioRefresh: true)
+        await refresh(forceAudioRefresh: true, coalesceIfBusy: true)
     }
 
     var trackTitle: String {
@@ -242,7 +242,7 @@ final class IslandViewModel: ObservableObject {
                     self.hiddenTickCounter = 0
                 }
 
-                Task { await self.refresh() }
+                Task { await self.refresh(coalesceIfBusy: false) }
             }
     }
 
@@ -263,13 +263,15 @@ final class IslandViewModel: ObservableObject {
         }
 
         let previousTrackID = playbackState.track?.id
-        let previousProgress = liveProgress
+        let previousLiveProgress = liveProgress
+        let previousSnapshotProgress = playbackState.track?.progress
         playbackState = normalizedState
 
         if let track = normalizedState.track {
             liveProgress = PlaybackProgress.resolved(
                 previousTrackID: previousTrackID,
-                previousProgress: previousProgress,
+                previousLiveProgress: previousLiveProgress,
+                previousSnapshotProgress: previousSnapshotProgress,
                 track: track,
                 isPlaying: normalizedState.isPlaying
             )
@@ -298,10 +300,12 @@ final class IslandViewModel: ObservableObject {
         lastProgressTickAt = now
     }
 
-    private func refresh(forceAudioRefresh: Bool = false) async {
+    private func refresh(forceAudioRefresh: Bool = false, coalesceIfBusy: Bool = true) async {
         if isRefreshing {
-            pendingRefresh = true
-            pendingForceAudioRefresh = pendingForceAudioRefresh || forceAudioRefresh
+            if coalesceIfBusy {
+                pendingRefresh = true
+                pendingForceAudioRefresh = pendingForceAudioRefresh || forceAudioRefresh
+            }
             return
         }
 
@@ -309,7 +313,7 @@ final class IslandViewModel: ObservableObject {
         var forceAudio = forceAudioRefresh
         defer { isRefreshing = false }
 
-        repeat {
+        for _ in 0..<2 {
             pendingRefresh = false
             let forceThisPass = forceAudio || pendingForceAudioRefresh
             forceAudio = false
@@ -323,7 +327,11 @@ final class IslandViewModel: ObservableObject {
                 await audioDeviceProvider.refresh()
                 lastAudioRefreshAt = now
             }
-        } while pendingRefresh
+
+            if pendingRefresh == false {
+                break
+            }
+        }
     }
 
     private func displayMetadata(_ value: String?) -> String? {
