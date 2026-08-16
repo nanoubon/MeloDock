@@ -20,6 +20,8 @@ final class IslandViewModel: ObservableObject {
     private var pollCancellable: AnyCancellable?
     private var progressTickCancellable: AnyCancellable?
     private var isRefreshing = false
+    private var pendingRefresh = false
+    private var pendingForceAudioRefresh = false
     private var hiddenTickCounter = 0
     private var lastAudioRefreshAt = Date.distantPast
     private var lastProgressTickAt = Date()
@@ -41,7 +43,9 @@ final class IslandViewModel: ObservableObject {
         bindAudio()
         switchProvider(to: initialProvider)
         startPolling()
-        startProgressTicker()
+        if settingsStore.overlayVisible {
+            startProgressTicker()
+        }
     }
 
     func bootstrap() async {
@@ -165,6 +169,7 @@ final class IslandViewModel: ObservableObject {
                 if self.selectedProvider != provider {
                     self.selectedProvider = provider
                     self.switchProvider(to: provider)
+                    Task { await self.refresh() }
                 }
             }
             .store(in: &cancellables)
@@ -172,8 +177,14 @@ final class IslandViewModel: ObservableObject {
         settingsStore.$overlayVisible
             .removeDuplicates()
             .sink { [weak self] isVisible in
-                guard isVisible else { return }
-                Task { await self?.refresh(forceAudioRefresh: true) }
+                guard let self else { return }
+                if isVisible {
+                    self.lastProgressTickAt = Date()
+                    self.startProgressTicker()
+                    Task { await self.refresh(forceAudioRefresh: true) }
+                } else {
+                    self.progressTickCancellable = nil
+                }
             }
             .store(in: &cancellables)
     }
@@ -188,7 +199,10 @@ final class IslandViewModel: ObservableObject {
 
         audioDeviceProvider.volumePublisher
             .sink { [weak self] volume in
-                self?.volume = volume
+                guard let self else { return }
+                if abs(self.volume - volume) > 0.01 {
+                    self.volume = volume
+                }
             }
             .store(in: &cancellables)
     }
@@ -253,12 +267,12 @@ final class IslandViewModel: ObservableObject {
         playbackState = normalizedState
 
         if let track = normalizedState.track {
-            if normalizedState.isPlaying, previousTrackID == track.id {
-                // Prevent stutter when provider reports slightly stale progress.
-                liveProgress = max(previousProgress, track.progress)
-            } else {
-                liveProgress = track.progress
-            }
+            liveProgress = PlaybackProgress.resolved(
+                previousTrackID: previousTrackID,
+                previousProgress: previousProgress,
+                track: track,
+                isPlaying: normalizedState.isPlaying
+            )
         } else {
             liveProgress = 0
         }
@@ -285,18 +299,31 @@ final class IslandViewModel: ObservableObject {
     }
 
     private func refresh(forceAudioRefresh: Bool = false) async {
-        guard isRefreshing == false else { return }
+        if isRefreshing {
+            pendingRefresh = true
+            pendingForceAudioRefresh = pendingForceAudioRefresh || forceAudioRefresh
+            return
+        }
+
         isRefreshing = true
+        var forceAudio = forceAudioRefresh
         defer { isRefreshing = false }
 
-        await activeProvider?.refreshNowPlaying()
+        repeat {
+            pendingRefresh = false
+            let forceThisPass = forceAudio || pendingForceAudioRefresh
+            forceAudio = false
+            pendingForceAudioRefresh = false
 
-        let now = Date()
-        let shouldRefreshAudio = forceAudioRefresh || now.timeIntervalSince(lastAudioRefreshAt) >= 8.0
-        if shouldRefreshAudio {
-            await audioDeviceProvider.refresh()
-            lastAudioRefreshAt = now
-        }
+            await activeProvider?.refreshNowPlaying()
+
+            let now = Date()
+            let shouldRefreshAudio = forceThisPass || now.timeIntervalSince(lastAudioRefreshAt) >= 8.0
+            if shouldRefreshAudio {
+                await audioDeviceProvider.refresh()
+                lastAudioRefreshAt = now
+            }
+        } while pendingRefresh
     }
 
     private func displayMetadata(_ value: String?) -> String? {

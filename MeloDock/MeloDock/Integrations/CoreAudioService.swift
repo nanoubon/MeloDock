@@ -188,19 +188,20 @@ final class CoreAudioService: AudioDeviceProvider, @unchecked Sendable {
 
     private func deviceName(for deviceID: AudioDeviceID) -> String {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceName,
+            mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
 
-        var cStringName = [CChar](repeating: 0, count: 256)
-        var size = UInt32(cStringName.count)
+        var name: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<CFString?>.size)
 
-        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &cStringName) == noErr else {
-            return "Output \(deviceID)"
+        if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &name) == noErr,
+           let name {
+            return name.takeRetainedValue() as String
         }
 
-        return String(cString: cStringName)
+        return "Output \(deviceID)"
     }
 
     private func setChannelVolume(deviceID: AudioDeviceID, channel: UInt32, value: Float32) {

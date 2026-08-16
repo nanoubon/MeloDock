@@ -65,12 +65,14 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
             return
         }
 
-        await MainActor.run {
-            startAuthSession(url: url)
-        }
+        startAuthSession(url: url)
     }
 
     func refreshNowPlaying() async {
+        await refreshNowPlaying(allowTokenRetry: true)
+    }
+
+    private func refreshNowPlaying(allowTokenRetry: Bool) async {
         do {
             let token = try await ensureValidAccessToken()
 
@@ -95,8 +97,16 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
             }
 
             if http.statusCode == 401 {
+                guard allowTokenRetry else {
+                    authSubject.send(.unauthorized)
+                    playbackSubject.send(.unavailable(
+                        provider: .spotify,
+                        message: Self.errorMessage(for: 401)
+                    ))
+                    return
+                }
                 _ = try await refreshAccessToken()
-                await refreshNowPlaying()
+                await refreshNowPlaying(allowTokenRetry: false)
                 return
             }
 
@@ -112,11 +122,22 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
             cachedIsPlaying = payload.is_playing
 
             let track = payload.item.map { item in
-                Track(
+                let artworkURL = item.album?.images.first?.url
+                    ?? item.images?.first?.url
+                    ?? item.show?.images.first?.url
+
+                let artist: String
+                if let artists = item.artists, artists.isEmpty == false {
+                    artist = artists.map(\.name).joined(separator: ", ")
+                } else {
+                    artist = item.show?.name ?? "Unknown Artist"
+                }
+
+                return Track(
                     id: item.id ?? UUID().uuidString,
                     title: item.name,
-                    artist: item.artists.map(\.name).joined(separator: ", "),
-                    artworkURL: URL(string: item.album.images.first?.url ?? ""),
+                    artist: artist,
+                    artworkURL: artworkURL.flatMap(URL.init(string:)),
                     duration: TimeInterval(item.duration_ms) / 1000,
                     progress: TimeInterval(payload.progress_ms ?? 0) / 1000
                 )
@@ -205,19 +226,21 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
             url: url,
             callbackURLScheme: "melodock"
         ) { [weak self] callbackURL, error in
-            guard let self else { return }
+            Task { @MainActor in
+                guard let self else { return }
 
-            if let error {
-                self.authSubject.send(.unavailable(error.localizedDescription))
-                return
+                if let error {
+                    self.authSubject.send(.unavailable(error.localizedDescription))
+                    return
+                }
+
+                guard let callbackURL else {
+                    self.authSubject.send(.unavailable("Spotify callback URL was missing."))
+                    return
+                }
+
+                await self.handleAuthCallback(url: callbackURL)
             }
-
-            guard let callbackURL else {
-                self.authSubject.send(.unavailable("Spotify callback URL was missing."))
-                return
-            }
-
-            Task { await self.handleAuthCallback(url: callbackURL) }
         }
 
         session.prefersEphemeralWebBrowserSession = true
@@ -235,7 +258,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
             return
         }
 
-        let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        let query = HTTPFormCoding.queryDictionary(from: components.queryItems)
 
         if let returnedError = query["error"] {
             authSubject.send(.unavailable("Spotify auth failed: \(returnedError)"))
@@ -274,7 +297,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         var request = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Self.formURLEncodedBody([
+        request.httpBody = HTTPFormCoding.encode([
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": Self.redirectURI,
@@ -308,7 +331,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         var request = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Self.formURLEncodedBody([
+        request.httpBody = HTTPFormCoding.encode([
             "grant_type": "refresh_token",
             "refresh_token": existingToken.refreshToken,
             "client_id": settingsStore.spotifyClientID
@@ -345,7 +368,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         return token.accessToken
     }
 
-    private func sendCommand(path: String, method: String) async throws {
+    private func sendCommand(path: String, method: String, allowTokenRetry: Bool = true) async throws {
         let token = try await ensureValidAccessToken()
 
         var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/player/\(path)")!)
@@ -358,8 +381,11 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         }
 
         if http.statusCode == 401 {
+            guard allowTokenRetry else {
+                throw SpotifyError.httpStatus(code: 401)
+            }
             _ = try await refreshAccessToken()
-            try await sendCommand(path: path, method: method)
+            try await sendCommand(path: path, method: method, allowTokenRetry: false)
             return
         }
 
@@ -379,19 +405,6 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
     }
 
     private static let redirectURI = "melodock://spotify-auth"
-
-    private static func formURLEncodedBody(_ params: [String: String]) -> Data? {
-        let body = params
-            .map { key, value in
-                let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
-                let escapedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
-                return "\(escapedKey)=\(escapedValue)"
-            }
-            .sorted()
-            .joined(separator: "&")
-
-        return body.data(using: .utf8)
-    }
 
     private static func randomString(length: Int) -> String {
         let characters = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
@@ -466,8 +479,16 @@ private struct SpotifyTrackPayload: Codable {
     let id: String?
     let name: String
     let duration_ms: Int
-    let artists: [SpotifyArtistPayload]
-    let album: SpotifyAlbumPayload
+    let type: String?
+    let artists: [SpotifyArtistPayload]?
+    let album: SpotifyAlbumPayload?
+    let images: [SpotifyImagePayload]?
+    let show: SpotifyShowPayload?
+}
+
+private struct SpotifyShowPayload: Codable {
+    let name: String?
+    let images: [SpotifyImagePayload]?
 }
 
 private struct SpotifyArtistPayload: Codable {

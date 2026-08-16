@@ -28,5 +28,19 @@ final class TrackTests: XCTestCase {
 
         XCTAssertEqual(track.progressFraction, 0.0, accuracy: 0.0001)
     }
+
+    func testZeroDurationPreservesLiveProgress() {
+        let track = Track(
+            id: "radio",
+            title: "Live Stream",
+            artist: "Station",
+            artworkURL: nil,
+            duration: 0,
+            progress: 42
+        )
+
+        XCTAssertEqual(track.progress, 42, accuracy: 0.0001)
+        XCTAssertEqual(track.progressFraction, 0.0, accuracy: 0.0001)
+    }
 }
 #endif

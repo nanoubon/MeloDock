@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
         configureIslandPanel()
         configureStatusItem()
         configureHotkey()
@@ -20,7 +21,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if container.settingsStore.showOnStartup {
             panelController?.show()
+        } else {
+            container.settingsStore.overlayVisible = false
         }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        panelController?.show()
+        return true
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -63,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         container.hotkeyService.register(hotkey: container.settingsStore.hotkey)
 
         container.settingsStore.$hotkey
+            .dropFirst()
+            .removeDuplicates()
             .sink { [weak self] hotkey in
                 self?.container.hotkeyService.register(hotkey: hotkey)
             }
@@ -70,12 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureLaunchAtLoginSync() {
-        container.settingsStore.$launchAtLogin
-            .removeDuplicates()
-            .sink { [weak self] enabled in
-                self?.container.launchAtLoginService.setEnabled(enabled)
-            }
-            .store(in: &cancellables)
+        let desired = container.settingsStore.launchAtLogin
+        if container.launchAtLoginService.isEnabled != desired {
+            container.launchAtLoginService.setEnabled(desired)
+        }
     }
 
     private func configureNotificationActions() {

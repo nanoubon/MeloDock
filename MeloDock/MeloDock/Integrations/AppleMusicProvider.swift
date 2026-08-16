@@ -843,9 +843,9 @@ final class AppleMusicProvider: MusicProvider {
         pendingArtworkLookups.insert(key)
 
         Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
-            let resolvedURL = await self.lookupArtworkURL(title: track.title, artist: track.artist)
+            let resolvedURL = await Self.lookupArtworkURL(title: track.title, artist: track.artist)
             await MainActor.run {
+                guard let self else { return }
                 self.pendingArtworkLookups.remove(key)
 
                 guard let resolvedURL else { return }
@@ -876,9 +876,9 @@ final class AppleMusicProvider: MusicProvider {
         }
     }
 
-    private func lookupArtworkURL(title: String, artist: String) async -> URL? {
-        let cleanedTitle = sanitizeMetadata(title)
-        let cleanedArtist = sanitizeMetadata(artist)
+    nonisolated private static func lookupArtworkURL(title: String, artist: String) async -> URL? {
+        let cleanedTitle = normalizeAppleScriptString(title)
+        let cleanedArtist = normalizeAppleScriptString(artist)
         guard cleanedTitle.isEmpty == false else { return nil }
 
         let query = "\(cleanedTitle) \(cleanedArtist)"

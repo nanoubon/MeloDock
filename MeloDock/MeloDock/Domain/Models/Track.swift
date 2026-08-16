@@ -28,7 +28,11 @@ struct Track: Identifiable, Equatable, Codable {
             self.tempoBPM = nil
         }
         self.duration = max(0, duration)
-        self.progress = max(0, min(progress, max(0, duration)))
+        if self.duration > 0 {
+            self.progress = max(0, min(progress, self.duration))
+        } else {
+            self.progress = max(0, progress)
+        }
     }
 
     var progressFraction: Double {
