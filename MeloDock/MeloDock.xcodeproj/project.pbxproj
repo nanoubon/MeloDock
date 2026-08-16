@@ -257,8 +257,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MeloDock/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MeloDock;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MeloDock controls the Music app to show now playing and media controls.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MeloDock uses Apple Music access to show and control playback.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -292,8 +294,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MeloDock/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MeloDock;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MeloDock controls the Music app to show now playing and media controls.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MeloDock uses Apple Music access to show and control playback.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

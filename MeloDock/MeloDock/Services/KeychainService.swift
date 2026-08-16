@@ -12,6 +12,7 @@ final class KeychainService {
     func set(data: Data, for key: String) throws {
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
         let addStatus = SecItemAdd(query as CFDictionary, nil)
         if addStatus == errSecSuccess {
