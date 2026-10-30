@@ -113,7 +113,6 @@ struct ExpandedMusicView: View {
                         barSpacing: 2
                     )
                     .fixedSize()
-                    .padding(.trailing, 4)
                 }
             }
             .frame(height: Layout.artworkSize)

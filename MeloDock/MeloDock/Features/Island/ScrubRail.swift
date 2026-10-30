@@ -59,13 +59,15 @@ struct ScrubRail: View {
 
     var body: some View {
         if let onChange {
-            rail.accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: onChange(ScrubRailMath.stepped(value, by: Layout.accessibilityStep))
-                case .decrement: onChange(ScrubRailMath.stepped(value, by: -Layout.accessibilityStep))
-                @unknown default: break
+            rail
+                .onHover { isHovering = $0 }
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: onChange(ScrubRailMath.stepped(value, by: Layout.accessibilityStep))
+                    case .decrement: onChange(ScrubRailMath.stepped(value, by: -Layout.accessibilityStep))
+                    @unknown default: break
+                    }
                 }
-            }
         } else {
             rail.accessibilityAddTraits(.updatesFrequently)
         }
@@ -103,9 +105,6 @@ struct ScrubRail: View {
             .frame(width: width, height: geometry.size.height)
             .contentShape(Rectangle())
             .gesture(dragGesture(width: width), including: onChange == nil ? .none : .all)
-        }
-        .onHover { hovering in
-            isHovering = hovering
         }
         .animation(IslandTheme.railAnimation(reduceMotion: reduceMotion), value: isActive)
         .accessibilityElement()
