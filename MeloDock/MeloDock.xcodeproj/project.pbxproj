@@ -336,6 +336,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MeloDock controls the Music app to show now playing and media controls.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MeloDock uses Apple Music access to show and control playback.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "MeloDock reads your calendar to show upcoming meetings on the island.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -371,6 +372,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MeloDock controls the Music app to show now playing and media controls.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MeloDock uses Apple Music access to show and control playback.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "MeloDock reads your calendar to show upcoming meetings on the island.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
