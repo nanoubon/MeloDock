@@ -844,7 +844,10 @@ final class AppleMusicProvider: MusicProvider {
 
         Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            let resolvedURL = await self.lookupArtworkURL(title: track.title, artist: track.artist)
+            var resolvedURL = await self.lookupArtworkURL(title: track.title, artist: track.artist)
+            if resolvedURL == nil {
+                resolvedURL = await self.fetchArtworkFromMusicApp(title: track.title, key: key)
+            }
             await MainActor.run {
                 self.pendingArtworkLookups.remove(key)
 
@@ -908,6 +911,38 @@ final class AppleMusicProvider: MusicProvider {
             return URL(string: upgradedArtworkURL)
         } catch {
             return nil
+        }
+    }
+
+    /// Last-resort cover: ask Music.app for the current track's artwork bytes (streamed tracks often
+    /// have no iTunes Search hit) and cache them as a file keyed by the artwork cache key.
+    private func fetchArtworkFromMusicApp(title: String, key: String) async -> URL? {
+        guard let directory = MusicArtworkFileStore.defaultDirectory() else { return nil }
+        let expectedTitle = sanitizeMetadata(title).lowercased()
+        let script = """
+        tell application id "com.apple.Music"
+            -- Reference `current track` directly: a variable holding the track object is rejected by the sandbox (-10004).
+            return {name of current track, data of artwork 1 of current track}
+        end tell
+        """
+
+        return await withCheckedContinuation { continuation in
+            scriptQueue.async {
+                guard let descriptor = try? Self.executeAppleScriptSync(script),
+                      descriptor.numberOfItems >= 2,
+                      let rawName = descriptor.atIndex(1)?.stringValue,
+                      let payload = descriptor.atIndex(2)?.data else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                // The track may have changed while the script ran; never cache another song's cover.
+                guard name == expectedTitle else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: MusicArtworkFileStore.store(payload, forKey: key, in: directory))
+            }
         }
     }
 
