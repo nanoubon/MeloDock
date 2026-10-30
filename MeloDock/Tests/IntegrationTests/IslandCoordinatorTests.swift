@@ -7,6 +7,30 @@ import XCTest
 private final class FakeSource: ActivitySource {
     let subject = PassthroughSubject<[IslandActivity], Never>()
     var activitiesPublisher: AnyPublisher<[IslandActivity], Never> { subject.eraseToAnyPublisher() }
+    let transients = PassthroughSubject<IslandTransient, Never>()
+    var transientsPublisher: AnyPublisher<IslandTransient, Never> { transients.eraseToAnyPublisher() }
+}
+
+/// Manual clock and scheduler: nothing fires until the test says so.
+@MainActor
+private final class ManualClock {
+    var now = Date(timeIntervalSinceReferenceDate: 5_000)
+    private(set) var delays: [TimeInterval] = []
+    private var fire: (@MainActor () -> Void)?
+    private(set) var cancelled = 0
+
+    func schedule(_ delay: TimeInterval, _ block: @escaping @MainActor () -> Void) -> AnyCancellable {
+        delays.append(delay)
+        fire = block
+        return AnyCancellable { [weak self] in
+            MainActor.assumeIsolated { self?.cancelled += 1 }
+        }
+    }
+
+    func advance(_ seconds: TimeInterval) {
+        now = now.addingTimeInterval(seconds)
+        fire?()
+    }
 }
 
 @MainActor
@@ -18,6 +42,18 @@ final class IslandCoordinatorTests: XCTestCase {
     private func make(enabled: Bool = true) -> (IslandCoordinator, FakeSource) {
         let source = FakeSource()
         return (IslandCoordinator(sources: [source], isIslandEnabled: enabled, hoverDelay: 0.02), source)
+    }
+
+    private func makeTransient(enabled: Bool = true) -> (IslandCoordinator, FakeSource, ManualClock) {
+        let source = FakeSource()
+        let clock = ManualClock()
+        let c = IslandCoordinator(sources: [source], isIslandEnabled: enabled, hoverDelay: 0.02,
+                                  now: { clock.now }, scheduler: { clock.schedule($0, $1) })
+        return (c, source, clock)
+    }
+
+    private func transient(_ id: String, _ duration: TimeInterval = 2.5) -> IslandTransient {
+        IslandTransient(id: id, kind: .audio, payload: .volume(0.5), duration: duration, sticky: false)
     }
 
     private func wait(_ seconds: TimeInterval = 0.12) async {
@@ -181,6 +217,91 @@ final class IslandCoordinatorTests: XCTestCase {
         await wait()
         XCTAssertEqual(c.mode, .expanded)
         XCTAssertEqual(events, [true])
+    }
+
+    // MARK: - Transients
+
+    func testModeFunctionPriority() {
+        typealias C = IslandCoordinator
+        XCTAssertEqual(C.mode(isExpanded: true, enabled: true, hasPrimary: true, hasTransient: true), .expanded)
+        XCTAssertEqual(C.mode(isExpanded: true, enabled: false, hasPrimary: false, hasTransient: false), .expanded)
+        XCTAssertEqual(C.mode(isExpanded: false, enabled: true, hasPrimary: true, hasTransient: true), .transient)
+        XCTAssertEqual(C.mode(isExpanded: false, enabled: true, hasPrimary: false, hasTransient: true), .transient)
+        XCTAssertEqual(C.mode(isExpanded: false, enabled: true, hasPrimary: true, hasTransient: false), .compact)
+        XCTAssertEqual(C.mode(isExpanded: false, enabled: false, hasPrimary: true, hasTransient: true), .idle)
+        XCTAssertEqual(C.mode(isExpanded: false, enabled: true, hasPrimary: false, hasTransient: false), .idle)
+    }
+
+    func testTransientShowsThenExpiresBackToCompact() {
+        let (c, s, clock) = makeTransient()
+        s.subject.send([activity("a")])
+        s.transients.send(transient("volume"))
+        XCTAssertEqual(c.transient?.id, "volume")
+        XCTAssertEqual(c.mode, .transient)
+        XCTAssertEqual(clock.delays.last ?? -1, 2.5, accuracy: 0.001)
+        clock.advance(2.5)
+        XCTAssertNil(c.transient)
+        XCTAssertEqual(c.mode, .compact)
+    }
+
+    func testQueuedTransientsShowInOrder() {
+        let (c, s, clock) = makeTransient()
+        s.transients.send(transient("a"))
+        s.transients.send(transient("b", 1))
+        XCTAssertEqual(c.transient?.id, "a")
+        clock.advance(2.5)
+        XCTAssertEqual(c.transient?.id, "b")
+        XCTAssertEqual(clock.delays.last ?? -1, 1, accuracy: 0.001)
+        clock.advance(1)
+        XCTAssertNil(c.transient)
+        XCTAssertEqual(c.mode, .idle)
+    }
+
+    func testExpandedSuppressesTransient() {
+        let (c, s, _) = makeTransient()
+        s.subject.send([activity("a")])
+        s.transients.send(transient("volume"))
+        XCTAssertEqual(c.mode, .transient)
+        c.expand()
+        XCTAssertNil(c.transient)
+        XCTAssertEqual(c.mode, .expanded)
+        c.toggleExpanded()
+        XCTAssertEqual(c.mode, .compact)
+    }
+
+    func testTransientArrivingWhileExpandedIsNotShown() {
+        let (c, s, _) = makeTransient()
+        s.subject.send([activity("a")])
+        c.expand()
+        s.transients.send(transient("volume"))
+        XCTAssertNil(c.transient)
+        c.toggleExpanded()
+        XCTAssertEqual(c.mode, .compact)
+    }
+
+    func testDisabledIslandDropsTransients() {
+        let (c, s, _) = makeTransient(enabled: false)
+        s.transients.send(transient("volume"))
+        XCTAssertNil(c.transient)
+        XCTAssertEqual(c.mode, .idle)
+
+        c.isIslandEnabled = true
+        s.transients.send(transient("volume"))
+        XCTAssertEqual(c.mode, .transient)
+        c.isIslandEnabled = false
+        XCTAssertNil(c.transient)
+        XCTAssertEqual(c.mode, .idle)
+        c.isIslandEnabled = true
+        XCTAssertNil(c.transient)
+    }
+
+    func testSameIdTransientCoalescesAndReschedules() {
+        let (c, s, clock) = makeTransient()
+        s.transients.send(transient("volume"))
+        clock.now = clock.now.addingTimeInterval(1)
+        s.transients.send(transient("volume"))
+        XCTAssertEqual(clock.delays.last ?? -1, 2.5, accuracy: 0.001)
+        XCTAssertEqual(c.transient?.id, "volume")
     }
 }
 #endif

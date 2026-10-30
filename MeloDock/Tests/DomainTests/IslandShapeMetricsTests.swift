@@ -29,6 +29,13 @@ final class IslandShapeMetricsTests: XCTestCase {
         XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 188))
     }
 
+    func testTransientMatchesCompactSize() {
+        XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: notch),
+                       IslandShapeMetrics.size(for: .compact, notch: notch))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: nil),
+                       IslandShapeMetrics.size(for: .compact, notch: nil))
+    }
+
     func testHitRectIsCenteredAndTopFlush() {
         let rect = IslandShapeMetrics.hitRect(
             panelFrame: CGRect(x: 100, y: 200, width: 640, height: 200),

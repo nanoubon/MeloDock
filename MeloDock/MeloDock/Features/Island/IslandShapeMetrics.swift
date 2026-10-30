@@ -1,6 +1,6 @@
 import CoreGraphics
 
-enum IslandMode: Equatable { case idle, compact, expanded }
+enum IslandMode: Equatable { case idle, compact, transient, expanded }
 
 enum IslandShapeMetrics {
     static let earWidth: CGFloat = 56
@@ -13,7 +13,7 @@ enum IslandShapeMetrics {
         case .idle:
             guard let notch else { return .zero }
             return CGSize(width: notch.width, height: notch.height)
-        case .compact:
+        case .compact, .transient:
             guard let notch else { return pillSize }
             return CGSize(width: notch.width + 2 * earWidth, height: notch.height)
         case .expanded:

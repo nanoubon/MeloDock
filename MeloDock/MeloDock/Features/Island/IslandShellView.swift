@@ -81,6 +81,9 @@ struct IslandShellView: View {
             CompactNowPlayingView(viewModel: viewModel)
                 .frame(width: size.width, height: size.height)
                 .transition(.opacity)
+        case .transient:
+            // Transient content is rendered by a later task.
+            EmptyView()
         case .expanded:
             ExpandedMusicView(viewModel: viewModel)
                 .frame(width: IslandShapeMetrics.expandedSize.width, height: IslandShapeMetrics.expandedSize.height)
@@ -105,7 +108,7 @@ struct IslandShellView: View {
     private func bottomRadius(for mode: IslandMode) -> CGFloat {
         switch mode {
         case .idle: Layout.idleRadius
-        case .compact: Layout.compactRadius
+        case .compact, .transient: Layout.compactRadius
         case .expanded: Layout.expandedRadius
         }
     }
