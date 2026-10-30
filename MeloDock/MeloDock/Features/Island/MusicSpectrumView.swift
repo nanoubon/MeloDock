@@ -5,12 +5,13 @@ struct MusicSpectrumView: View {
     let seed: Int
     let progress: TimeInterval
     let tempoBPM: Double
+    // Bar geometry; the defaults are the compact ear's look.
+    var barCount = 14
+    var barWidth: CGFloat = 2.8
+    var barHeight: CGFloat = 12
+    var barSpacing: CGFloat = 2.4
 
     private enum Layout {
-        static let barCount = 14
-        static let barWidth: CGFloat = 2.8
-        static let barHeight: CGFloat = 12
-        static let spacing: CGFloat = 2.4
         static let minScale: CGFloat = 0.18
         static let maxScale: CGFloat = 1.0
     }
@@ -25,16 +26,16 @@ struct MusicSpectrumView: View {
                 bars(for: progress, active: false)
             }
         }
-        .frame(height: Layout.barHeight)
+        .frame(height: barHeight)
         .accessibilityLabel("Music Spectrum")
     }
 
     private func bars(for time: TimeInterval, active: Bool) -> some View {
-        HStack(alignment: .bottom, spacing: Layout.spacing) {
-            ForEach(0..<Layout.barCount, id: \.self) { index in
+        HStack(alignment: .bottom, spacing: barSpacing) {
+            ForEach(0..<barCount, id: \.self) { index in
                 Capsule(style: .continuous)
                     .fill(barGradient(for: index, active: active))
-                    .frame(width: Layout.barWidth, height: Layout.barHeight)
+                    .frame(width: barWidth, height: barHeight)
                     .scaleEffect(
                         x: 1,
                         y: active ? scale(for: index, at: time) : 0.22,
@@ -42,11 +43,11 @@ struct MusicSpectrumView: View {
                     )
             }
         }
-        .frame(height: Layout.barHeight, alignment: .bottom)
+        .frame(height: barHeight, alignment: .bottom)
     }
 
     private func barGradient(for index: Int, active: Bool) -> LinearGradient {
-        let ratio = Double(index) / Double(max(Layout.barCount - 1, 1))
+        let ratio = Double(index) / Double(max(barCount - 1, 1))
 
         if active {
             let startHue = 0.58 - (ratio * 0.14)

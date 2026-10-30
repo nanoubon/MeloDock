@@ -5,7 +5,7 @@ enum IslandMode: Equatable { case idle, compact, expanded }
 enum IslandShapeMetrics {
     static let earWidth: CGFloat = 56
     /// Expanded content size; on a notched screen the shape is taller by the notch height.
-    static let expandedSize = CGSize(width: 612, height: 176)
+    static let expandedSize = CGSize(width: 612, height: 188)
     static let pillSize = CGSize(width: 220, height: 34)
 
     static func size(for mode: IslandMode, notch: NotchGeometry?) -> CGSize {

@@ -14,7 +14,7 @@ final class IslandShapeMetricsTests: XCTestCase {
     }
 
     func testExpandedWithNotchAddsNotchHeight() {
-        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch), CGSize(width: 612, height: 208))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch), CGSize(width: 612, height: 220))
     }
 
     func testIdleWithoutNotchIsZero() {
@@ -26,7 +26,7 @@ final class IslandShapeMetricsTests: XCTestCase {
     }
 
     func testExpandedWithoutNotch() {
-        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 176))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 188))
     }
 
     func testHitRectIsCenteredAndTopFlush() {
