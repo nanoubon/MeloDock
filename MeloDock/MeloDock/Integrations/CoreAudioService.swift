@@ -6,7 +6,60 @@ import Foundation
 final class CoreAudioService: AudioDeviceProvider, @unchecked Sendable {
     private let outputsSubject = CurrentValueSubject<[AudioOutput], Never>([])
     private let volumeSubject = CurrentValueSubject<Float, Never>(0.5)
+    private let eventsSubject = PassthroughSubject<AudioDeviceEvent, Never>()
     private let queue = DispatchQueue(label: "com.nano.melodock.coreaudio", qos: .utility)
+    private let listeners = CoreAudioListenerBag()
+    private static let volumeTag = "defaultOutputVolume"
+
+    init() {
+        startListening()
+    }
+
+    deinit {
+        listeners.removeAll()
+    }
+
+    var eventsPublisher: AnyPublisher<AudioDeviceEvent, Never> {
+        eventsSubject.eraseToAnyPublisher()
+    }
+
+    private func startListening() {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        listeners.add(objectID: system, selector: kAudioHardwarePropertyDevices) { [weak self] in
+            self?.eventsSubject.send(.outputsChanged)
+        }
+        listeners.add(objectID: system, selector: kAudioHardwarePropertyDefaultOutputDevice) { [weak self] in
+            guard let self else { return }
+            self.registerVolumeListener()
+            self.eventsSubject.send(.defaultOutputChanged)
+        }
+        registerVolumeListener()
+    }
+
+    /// (Re)registers the volume listeners on the current default output device.
+    private func registerVolumeListener() {
+        listeners.remove(tag: Self.volumeTag)
+        guard let deviceID = defaultOutputDeviceID() else { return }
+        let notify: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.eventsSubject.send(.volumeChanged(self.fetchCurrentVolume()))
+        }
+        var virtualAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        if AudioObjectHasProperty(deviceID, &virtualAddress) {
+            listeners.add(objectID: deviceID, selector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+                          scope: kAudioDevicePropertyScopeOutput, tag: Self.volumeTag, handler: notify)
+        } else {
+            for channel: AudioObjectPropertyElement in [1, 2] {
+                listeners.add(objectID: deviceID, selector: kAudioDevicePropertyVolumeScalar,
+                              scope: kAudioDevicePropertyScopeOutput, element: channel,
+                              tag: Self.volumeTag, handler: notify)
+            }
+        }
+    }
 
     var outputsPublisher: AnyPublisher<[AudioOutput], Never> {
         outputsSubject
@@ -114,7 +167,8 @@ final class CoreAudioService: AudioDeviceProvider, @unchecked Sendable {
             return AudioOutput(
                 id: String(deviceID),
                 name: deviceName(for: deviceID),
-                isCurrent: deviceID == current
+                isCurrent: deviceID == current,
+                isBluetooth: isBluetooth(deviceID)
             )
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -184,6 +238,18 @@ final class CoreAudioService: AudioDeviceProvider, @unchecked Sendable {
 
         var size: UInt32 = 0
         return AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr && size > 0
+    }
+
+    private func isBluetooth(_ deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transport) == noErr else { return false }
+        return transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE
     }
 
     private func deviceName(for deviceID: AudioDeviceID) -> String {

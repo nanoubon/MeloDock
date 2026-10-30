@@ -21,7 +21,6 @@ final class IslandViewModel: ObservableObject {
     private var progressTickCancellable: AnyCancellable?
     private var isRefreshing = false
     private var hiddenTickCounter = 0
-    private var lastAudioRefreshAt = Date.distantPast
     private var lastProgressTickAt = Date()
 
     init(
@@ -190,6 +189,14 @@ final class IslandViewModel: ObservableObject {
                 self?.volume = volume
             }
             .store(in: &cancellables)
+
+        audioDeviceProvider.eventsPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let provider = self?.audioDeviceProvider else { return }
+                Task { await provider.refresh() }
+            }
+            .store(in: &cancellables)
     }
 
     private func switchProvider(to provider: MusicProviderKind) {
@@ -290,11 +297,9 @@ final class IslandViewModel: ObservableObject {
 
         await activeProvider?.refreshNowPlaying()
 
-        let now = Date()
-        let shouldRefreshAudio = forceAudioRefresh || now.timeIntervalSince(lastAudioRefreshAt) >= 8.0
-        if shouldRefreshAudio {
+        // Audio changes arrive through `eventsPublisher`; poll-free apart from this forced refresh.
+        if forceAudioRefresh {
             await audioDeviceProvider.refresh()
-            lastAudioRefreshAt = now
         }
     }
 
