@@ -1,3 +1,4 @@
+#if canImport(XCTest)
 import Combine
 import XCTest
 @testable import MeloDock
@@ -110,6 +111,27 @@ final class IslandCoordinatorTests: XCTestCase {
         XCTAssertEqual(c.mode, .compact)
     }
 
+    func testToggleCollapseBeforeDelayDoesNotReExpandFromStaleHover() async {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.pointerEntered()
+        c.toggleExpanded()
+        c.toggleExpanded()
+        XCTAssertEqual(c.mode, .compact)
+        await wait()
+        XCTAssertEqual(c.mode, .compact)
+        XCTAssertFalse(c.isExpanded)
+    }
+
+    func testPointerExitCollapsesWhenEnteredWhileAlreadyExpanded() {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.toggleExpanded()
+        c.pointerEntered()
+        c.pointerExited()
+        XCTAssertEqual(c.mode, .compact)
+    }
+
     func testDisabledIslandNeverShowsCompact() {
         let (c, s) = make(enabled: false)
         s.subject.send([activity("a")])
@@ -134,3 +156,4 @@ final class IslandCoordinatorTests: XCTestCase {
         XCTAssertEqual(events, [true, false])
     }
 }
+#endif
