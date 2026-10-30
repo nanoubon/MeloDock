@@ -12,6 +12,10 @@ final class IslandCoordinator: ObservableObject {
     @Published var isIslandEnabled: Bool {
         didSet { if !isIslandEnabled { clearTransients() } }
     }
+    /// Kinds the user has enabled; activities and transients of other kinds are ignored.
+    @Published var enabledKinds: Set<IslandActivity.Kind> = IslandKindFilter.all {
+        didSet { if enabledKinds != oldValue { applyEnabledKinds(removed: oldValue.subtracting(enabledKinds)) } }
+    }
     @Published private(set) var transient: IslandTransient?
     @Published private(set) var notch: NotchGeometry?
 
@@ -59,13 +63,24 @@ final class IslandCoordinator: ObservableObject {
                 .sink { [weak self] list in
                     guard let self else { return }
                     self.latest[index] = list
-                    self.selection = IslandSelection.select(from: self.latest.values.flatMap { $0 })
+                    self.recomputeSelection()
                 }
                 .store(in: &cancellables)
             source.transientsPublisher
                 .sink { [weak self] item in self?.receive(item) }
                 .store(in: &cancellables)
         }
+    }
+
+    private func recomputeSelection() {
+        let enabled = latest.values.flatMap { $0 }.filter { enabledKinds.contains($0.kind) }
+        selection = IslandSelection.select(from: enabled)
+    }
+
+    private func applyEnabledKinds(removed: Set<IslandActivity.Kind>) {
+        recomputeSelection()
+        for kind in removed { queue.remove(kind: kind, now: now()) }
+        syncTransient()
     }
 
     func updateNotch(_ notch: NotchGeometry?) {
@@ -110,7 +125,7 @@ final class IslandCoordinator: ObservableObject {
 
     /// Transients appear only while collapsed and enabled; anything else is dropped, not deferred.
     private func receive(_ item: IslandTransient) {
-        guard isIslandEnabled, !isExpanded else { return }
+        guard isIslandEnabled, !isExpanded, enabledKinds.contains(item.kind) else { return }
         queue.enqueue(item, now: now())
         syncTransient()
     }
@@ -140,5 +155,15 @@ final class IslandCoordinator: ObservableObject {
         isExpanded = value
         if value { clearTransients() }
         onExpandedChanged?(value)
+    }
+}
+
+extension SettingsStore {
+    /// Kinds the island should show, re-evaluated whenever a per-activity switch changes.
+    var enabledKindsPublisher: AnyPublisher<Set<IslandActivity.Kind>, Never> {
+        Publishers.CombineLatest3($showPower, $showAudio, $showCapture)
+            .map { IslandKindFilter.enabledKinds(showPower: $0, showAudio: $1, showCapture: $2) }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 }

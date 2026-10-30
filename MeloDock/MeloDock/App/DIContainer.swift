@@ -25,12 +25,15 @@ final class DIContainer: ObservableObject {
 
     lazy var islandCoordinator: IslandCoordinator = {
         let coordinator = IslandCoordinator(
-            sources: [nowPlayingActivitySource],
+            sources: [nowPlayingActivitySource, powerActivitySource, audioActivitySource, captureActivitySource],
             isIslandEnabled: settingsStore.showOnStartup
         )
         settingsStore.$showOnStartup
             .removeDuplicates()
             .assign(to: &coordinator.$isIslandEnabled)
+        // Power, audio and capture can each be switched off in Settings; the coordinator filters by kind.
+        settingsStore.enabledKindsPublisher
+            .assign(to: &coordinator.$enabledKinds)
         return coordinator
     }()
 
@@ -47,6 +50,28 @@ final class DIContainer: ObservableObject {
     // Held here because the coordinator only keeps its subscription, not the source.
     private lazy var nowPlayingActivitySource = NowPlayingActivitySource(
         playbackStates: islandViewModel.$playbackState.eraseToAnyPublisher()
+    )
+
+    // The services and sources below are held here because the coordinator only keeps its subscriptions.
+    private lazy var powerSourceService = PowerSourceService()
+
+    private lazy var powerActivitySource = PowerActivitySource(
+        states: powerSourceService.statePublisher
+    )
+
+    private lazy var audioActivitySource: AudioActivitySource = {
+        // The source only listens to the provider's publishers; IslandViewModel is what calls
+        // `refresh()` on hardware events. Touching it here guarantees it exists (and has bound the
+        // events) before the source subscribes, without a second refresh path.
+        _ = islandViewModel
+        return AudioActivitySource(provider: audioDeviceProvider)
+    }()
+
+    // Microphone only: camera detection stays off until the sandbox behaviour is verified on hardware.
+    private lazy var captureActivityService = CaptureActivityService()
+
+    private lazy var captureActivitySource = CaptureActivitySource(
+        usage: captureActivityService.usagePublisher
     )
 
     private lazy var musicProviders: [MusicProviderKind: MusicProvider] = [

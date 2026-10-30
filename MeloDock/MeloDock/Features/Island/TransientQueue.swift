@@ -41,6 +41,19 @@ struct TransientQueue: Equatable {
         expiresAt = now.addingTimeInterval(current.duration)
     }
 
+    /// Drops every item of `kind` (e.g. the user switched that source off). If the current item goes,
+    /// the next pending one takes its place with a fresh clock.
+    mutating func remove(kind: IslandActivity.Kind, now: Date) {
+        pending.removeAll { $0.kind == kind }
+        guard current?.kind == kind else { return }
+        if pending.isEmpty {
+            current = nil
+            expiresAt = nil
+        } else {
+            show(pending.removeFirst(), now: now)
+        }
+    }
+
     mutating func clear() {
         current = nil
         pending.removeAll()

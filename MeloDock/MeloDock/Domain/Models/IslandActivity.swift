@@ -1,6 +1,6 @@
 /// One thing the island can show (now playing, timer, ...).
 struct IslandActivity: Identifiable, Equatable {
-    enum Kind: Hashable { case nowPlaying, power, audio, capture, timer, calendar }
+    enum Kind: Hashable, CaseIterable { case nowPlaying, power, audio, capture, timer, calendar }
 
     enum Priority {
         static let timer = 100
@@ -43,4 +43,17 @@ struct IslandSelection: Equatable {
         }
         return IslandSelection(primary: sorted.first, secondary: sorted.dropFirst().first)
     }
+}
+
+/// Which activity kinds the user has switched on. Kinds without a Settings switch are always enabled.
+enum IslandKindFilter {
+    static func enabledKinds(showPower: Bool, showAudio: Bool, showCapture: Bool) -> Set<IslandActivity.Kind> {
+        var kinds = Set(IslandActivity.Kind.allCases)
+        if !showPower { kinds.remove(.power) }
+        if !showAudio { kinds.remove(.audio) }
+        if !showCapture { kinds.remove(.capture) }
+        return kinds
+    }
+
+    static let all = Set(IslandActivity.Kind.allCases)
 }
