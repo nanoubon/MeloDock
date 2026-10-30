@@ -21,7 +21,6 @@ let outputs: [(name: String, pixels: Int)] = [
     ("icon_128x128@1x.png", 128), ("icon_128x128@2x.png", 256),
     ("icon_256x256@1x.png", 256), ("icon_256x256@2x.png", 512),
     ("icon_512x512@1x.png", 512), ("icon_512x512@2x.png", 1024),
-    ("icon_1024x1024.png", 1024),
 ]
 
 let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
