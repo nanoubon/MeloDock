@@ -62,13 +62,12 @@ final class IslandViewModel: ObservableObject {
         return playbackState.message ?? "Open Apple Music or Spotify"
     }
 
+    var hasKnownDuration: Bool {
+        PlaybackProgress.isKnown(duration: playbackState.track?.duration)
+    }
+
     var progressFraction: Double {
-        if let duration = playbackState.track?.duration, duration > 0 {
-            return min(max(liveProgress / duration, 0), 1)
-        }
-        guard playbackState.isPlaying else { return 0 }
-        let cycle = liveProgress.truncatingRemainder(dividingBy: 20)
-        return cycle / 20
+        PlaybackProgress.fraction(progress: liveProgress, duration: playbackState.track?.duration)
     }
 
     var artworkURL: URL? {

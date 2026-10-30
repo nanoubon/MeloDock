@@ -154,7 +154,10 @@ struct ExpandedMusicView: View {
             .frame(height: Layout.timesHeight)
             .accessibilityHidden(true)
         }
-        .opacity(playbackOpacity)
+        // Unknown duration (e.g. streamed Apple Music tracks): hide the row but keep its layout space.
+        .opacity(viewModel.hasKnownDuration ? playbackOpacity : 0)
+        .accessibilityHidden(!viewModel.hasKnownDuration)
+        .allowsHitTesting(viewModel.hasKnownDuration)
     }
 
     private var transportRow: some View {
