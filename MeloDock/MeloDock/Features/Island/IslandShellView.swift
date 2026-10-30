@@ -61,7 +61,9 @@ struct IslandShellView: View {
             TapGesture().onEnded { coordinator.expand() },
             including: mode == .expanded ? .subviews : .all
         )
+        .overlay(alignment: .topTrailing) { secondaryCircle }
         .animation(shapeAnimation(to: mode), value: mode)
+        .animation(shapeAnimation(to: mode), value: coordinator.selection.secondary?.id)
         .onChange(of: mode) { _, newMode in
             previousMode = newMode
         }
@@ -78,12 +80,16 @@ struct IslandShellView: View {
             EmptyView()
         case .compact:
             let size = IslandShapeMetrics.size(for: .compact, notch: coordinator.notch)
-            CompactNowPlayingView(viewModel: viewModel)
+            compactContent
                 .frame(width: size.width, height: size.height)
                 .transition(.opacity)
         case .transient:
-            // Transient content is rendered by a later task.
-            EmptyView()
+            if let transient = coordinator.transient {
+                let size = IslandShapeMetrics.size(for: .transient, notch: coordinator.notch)
+                SystemAlertView(transient: transient)
+                    .frame(width: size.width, height: size.height)
+                    .transition(.opacity)
+            }
         case .expanded:
             ExpandedMusicView(viewModel: viewModel)
                 .frame(width: IslandShapeMetrics.expandedSize.width, height: IslandShapeMetrics.expandedSize.height)
@@ -94,6 +100,35 @@ struct IslandShellView: View {
                     insertion: .identity,
                     removal: .opacity.animation(reduceMotion ? Motion.reducedContentOut : Motion.contentOut)
                 ))
+        }
+    }
+
+    @ViewBuilder
+    private var compactContent: some View {
+        switch CompactContent.make(for: coordinator.selection.primary) {
+        case .nowPlaying:
+            CompactNowPlayingView(viewModel: viewModel)
+        case let .capture(mic, camera):
+            CompactCaptureView(mic: mic, camera: camera)
+        case .empty:
+            Color.clear
+        }
+    }
+
+    /// The second activity, drawn just right of the island at the same height.
+    @ViewBuilder
+    private var secondaryCircle: some View {
+        let hasSecondary = coordinator.selection.secondary != nil
+        if IslandShapeMetrics.secondaryFrame(panelFrame: .zero, mode: coordinator.mode,
+                                             notch: coordinator.notch, hasSecondary: hasSecondary) != nil,
+           let secondary = coordinator.selection.secondary {
+            let diameter = IslandShapeMetrics.secondaryCircleSize(notch: coordinator.notch)
+            SecondaryCircleView(activity: secondary, diameter: diameter)
+                .contentShape(Circle())
+                .onTapGesture { coordinator.expand() }
+                // Trailing-aligned to the island, then pushed one diameter plus the gap right.
+                .offset(x: diameter + IslandShapeMetrics.secondaryGap)
+                .transition(.scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
         }
     }
 

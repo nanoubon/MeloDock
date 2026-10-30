@@ -8,7 +8,7 @@ import SwiftUI
 @MainActor
 final class IslandPanelController {
     private enum Layout {
-        static let width: CGFloat = 640
+        static let width: CGFloat = IslandShapeMetrics.panelWidth
         // Fits the tallest expanded shape (188 + notch height) plus its drop shadow.
         static let height: CGFloat = 260
     }
@@ -111,8 +111,9 @@ final class IslandPanelController {
 
     private func observeCoordinator() {
         // @Published emits before the property changes; hop to the main queue so `mode` is current.
-        Publishers.Merge4(
+        Publishers.Merge5(
             coordinator.$selection.map { _ in () },
+            coordinator.$transient.map { _ in () },
             coordinator.$isExpanded.map { _ in () },
             coordinator.$isIslandEnabled.map { _ in () },
             coordinator.$notch.map { _ in () }
@@ -188,14 +189,23 @@ final class IslandPanelController {
         }
     }
 
-    /// Lets clicks through outside the current island shape; returns whether the cursor is inside it.
+    /// Lets clicks through outside the current island shape and secondary circle; returns whether the cursor is inside it.
     private func refreshClickThrough() -> Bool {
         let size = IslandShapeMetrics.size(for: coordinator.mode, notch: coordinator.notch)
         var hitRect = IslandShapeMetrics.hitRect(panelFrame: panel.frame, size: size)
         // The cursor can sit exactly on the screen's top edge, which `contains` treats as outside.
         hitRect.size.height += 1
-        let inside = hitRect.contains(NSEvent.mouseLocation)
-        setIgnoresMouseEvents(!inside)
+        let mouse = NSEvent.mouseLocation
+        let inside = hitRect.contains(mouse)
+        // The secondary circle takes clicks but does not count as hovering the island.
+        var overCircle = false
+        if var circle = IslandShapeMetrics.secondaryFrame(
+            panelFrame: panel.frame, mode: coordinator.mode, notch: coordinator.notch,
+            hasSecondary: coordinator.selection.secondary != nil) {
+            circle.size.height += 1
+            overCircle = circle.contains(mouse)
+        }
+        setIgnoresMouseEvents(!(inside || overCircle))
         return inside
     }
 
