@@ -35,7 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "music.note.house", accessibilityDescription: "MeloDock")
+            let image = NSImage(named: "StatusBarIcon")
+            image?.isTemplate = true
+            image?.accessibilityDescription = "MeloDock"
+            button.image = image
             button.imagePosition = .imageOnly
         }
 

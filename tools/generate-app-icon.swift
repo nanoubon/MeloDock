@@ -1,4 +1,5 @@
-// Renders the MeloDock app icon ("island capsule") into AppIcon.appiconset.
+// Renders the MeloDock app icon ("island capsule") into AppIcon.appiconset,
+// plus the matching menu bar template image into StatusBarIcon.imageset.
 // Usage: swift tools/generate-app-icon.swift
 //
 // Everything is drawn in a 100-unit design space mapped onto the icon body,
@@ -156,10 +157,47 @@ func drawIcon(pixels: Int) -> CGImage {
     return ctx.makeImage()!
 }
 
-for output in outputs {
-    let url = outputDir.appendingPathComponent(output.name)
+/// Menu bar template image: the same capsule as one black shape with the
+/// artwork tile and spectrum bars knocked out, on a 22 x 16 pt canvas.
+func drawStatusBarIcon(scale: Int) -> CGImage {
+    let width = 22 * scale, height = 16 * scale
+    let ctx = CGContext(
+        data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
+    ctx.translateBy(x: 0, y: CGFloat(height))
+    ctx.scaleBy(x: CGFloat(scale), y: -CGFloat(scale))
+
+    ctx.addPath(pill(CGRect(x: 1, y: 3, width: 20, height: 10)))
+    ctx.setFillColor(color(0x000000))
+    ctx.fillPath()
+
+    ctx.setBlendMode(.clear)
+    ctx.addPath(pill(CGRect(x: 4, y: 5, width: 6, height: 6), radius: 1.5))
+    for bar in [
+        CGRect(x: 11.5, y: 6, width: 1.5, height: 4),
+        CGRect(x: 14, y: 5, width: 1.5, height: 6),
+        CGRect(x: 16.5, y: 6.5, width: 1.5, height: 3),
+    ] { ctx.addPath(pill(bar)) }
+    ctx.fillPath()
+
+    return ctx.makeImage()!
+}
+
+func writePNG(_ image: CGImage, to url: URL) {
     let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
-    CGImageDestinationAddImage(destination, drawIcon(pixels: output.pixels), nil)
+    CGImageDestinationAddImage(destination, image, nil)
     guard CGImageDestinationFinalize(destination) else { fatalError("Failed to write \(url.path)") }
+}
+
+for output in outputs {
+    writePNG(drawIcon(pixels: output.pixels), to: outputDir.appendingPathComponent(output.name))
     print("wrote \(output.name) (\(output.pixels)px)")
+}
+
+let statusBarDir = outputDir.deletingLastPathComponent().appendingPathComponent("StatusBarIcon.imageset")
+for scale in [1, 2] {
+    let name = "statusbar@\(scale)x.png"
+    writePNG(drawStatusBarIcon(scale: scale), to: statusBarDir.appendingPathComponent(name))
+    print("wrote \(name)")
 }
