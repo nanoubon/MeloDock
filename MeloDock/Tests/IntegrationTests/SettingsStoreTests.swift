@@ -54,5 +54,47 @@ final class SettingsStoreTests: XCTestCase {
 
         defaults.removePersistentDomain(forName: suiteName)
     }
+
+    @MainActor
+    func testIslandActivityTogglesDefaultToTrue() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Could not create isolated UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.showPower)
+        XCTAssertTrue(store.showAudio)
+        XCTAssertTrue(store.showCapture)
+
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    @MainActor
+    func testIslandActivityTogglesPersistUnderTheirKeys() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Could not create isolated UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(defaults: defaults)
+        store.showPower = false
+        store.showAudio = false
+        store.showCapture = false
+        XCTAssertEqual(defaults.object(forKey: "settings.island.power") as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: "settings.island.audio") as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: "settings.island.capture") as? Bool, false)
+
+        let reloaded = SettingsStore(defaults: defaults)
+        XCTAssertFalse(reloaded.showPower)
+        XCTAssertFalse(reloaded.showAudio)
+        XCTAssertFalse(reloaded.showCapture)
+
+        defaults.removePersistentDomain(forName: suiteName)
+    }
 }
 #endif
