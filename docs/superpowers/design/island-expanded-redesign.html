@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>MeloDock expanded island redesign</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--t1:#fff;--t2:rgba(255,255,255,.70);--t3:rgba(255,255,255,.55);--chip:rgba(255,255,255,.10);--chip-h:rgba(255,255,255,.16);--track:rgba(255,255,255,.22);--notch-h:34px;--notch-w:190px}
+*{box-sizing:border-box}
+body{margin:0;background:#2a2d33;color:#ddd;font:13px/1.4 -apple-system,"SF Pro Text",system-ui,sans-serif;padding:24px}
+h1{font-size:18px;margin:0 0 4px}p.n{margin:0 0 20px;color:#9aa}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#9aa;margin:28px 0 10px}
+.grid{display:flex;gap:32px;flex-wrap:wrap}
+.scene{width:660px}
+.bar{height:var(--notch-h);background:#16181c;position:relative;width:660px;border-radius:0}
+.bar span{position:absolute;top:8px;font-size:12px;color:#aab}
+.stage{position:relative;width:660px;height:260px;background:linear-gradient(160deg,#3a4a66,#6b4a73 60%,#8a5a5a);margin-top:-34px;padding-top:0}
+.stage .bar{background:rgba(20,22,26,.55)}
+.island{position:absolute;top:0;left:24px;width:612px;background:#000;color:var(--t1);
+ border-radius:0 0 30px 30px;box-shadow:0 6px 14px rgba(0,0,0,.4),inset 0 -1px 0 rgba(255,255,255,.08);padding-top:var(--notch-h);overflow:hidden}
+.notchmark{position:absolute;top:0;left:50%;width:var(--notch-w);height:var(--notch-h);margin-left:calc(var(--notch-w)/-2);border-bottom:1px dashed rgba(255,255,255,.18);font-size:10px;color:#555;text-align:center;line-height:var(--notch-h)}
+.c{width:612px;position:relative}
+/* AFTER (content 612x188) */
+.after .c{height:188px;padding:16px 24px 14px}
+.row1{display:flex;gap:16px;height:72px;align-items:center}
+.art{width:72px;height:72px;border-radius:16px;flex:none;background:linear-gradient(135deg,#f6a04d,#d6336c 55%,#4c2a85);box-shadow:0 0 0 .5px rgba(255,255,255,.12) inset}
+.txt{flex:1;min-width:0}
+.title{font:600 19px/24px -apple-system,system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.2px}
+.artist{font:400 14px/18px -apple-system,system-ui;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.rt{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;height:72px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:14px;background:var(--chip);font:500 12px -apple-system,system-ui;color:var(--t1);cursor:default}
+.chip:hover{background:var(--chip-h)}
+.chip.fill{background:#fff;color:#000;font-weight:600}
+.chip i{font-style:normal;color:var(--t2);font-size:10px}
+.spec{display:flex;gap:2px;align-items:flex-end;height:16px;margin-right:4px}
+.spec b{width:3px;border-radius:2px;background:linear-gradient(#fff,rgba(255,255,255,.55))}
+.prog{margin-top:10px;height:30px}
+.track{height:14px;display:flex;align-items:center;position:relative}
+.track:before{content:"";position:absolute;left:0;right:0;height:4px;border-radius:2px;background:var(--track);top:5px;transition:all .15s}
+.fill{position:absolute;left:0;width:38%;height:4px;top:5px;border-radius:2px;background:#fff;transition:all .15s}
+.knob{position:absolute;left:38%;top:7px;width:0;height:0;margin-left:0;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.4);transition:all .15s}
+.track:hover:before,.track:hover .fill{height:6px;top:4px}
+.track:hover .knob{width:12px;height:12px;top:1px;margin-left:-6px}
+.times{display:flex;justify-content:space-between;font:500 11px/14px ui-rounded,"SF Pro Rounded",-apple-system;font-variant-numeric:tabular-nums;color:var(--t3);margin-top:2px}
+.ctl{margin-top:2px;height:44px;display:flex;align-items:center}
+.ctl .l,.ctl .r{width:180px;display:flex;align-items:center}.ctl .r{justify-content:flex-end}
+.ctl .m{flex:1;display:flex;justify-content:center;gap:12px;align-items:center}
+.btn{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:#fff}
+.btn:hover{background:rgba(255,255,255,.12)}.btn:active{transform:scale(.92);opacity:.7}
+.btn.sm svg{width:20px;height:20px}.btn.pp svg{width:30px;height:30px}
+.vol{display:flex;align-items:center;gap:8px;color:var(--t2)}
+.vol .s{width:112px;height:14px;position:relative}
+.vol .s:before{content:"";position:absolute;left:0;right:0;top:5px;height:4px;border-radius:2px;background:var(--track)}
+.vol .s:after{content:"";position:absolute;left:0;width:62%;top:5px;height:4px;border-radius:2px;background:rgba(255,255,255,.9)}
+.vol .s:hover:before,.vol .s:hover:after{top:4px;height:6px}
+.dim{opacity:.35}
+/* BEFORE (content 612x176) */
+.before .c{height:176px;padding:16px}
+.before .top{display:flex;gap:10px;align-items:center;height:60px}
+.before .art{width:60px;height:60px;border-radius:14px}
+.before .title{font-size:17px}.before .artist{font:500 13px -apple-system;color:rgba(255,255,255,.76)}
+.field{height:40px;border-radius:20px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.13);display:flex;align-items:center;padding:0 12px;font:600 13px -apple-system;gap:8px}
+.before .bar5{height:5px;border-radius:3px;background:rgba(255,255,255,.16);position:relative;margin-top:10px}
+.before .bar5:after{content:"";position:absolute;left:0;width:38%;height:5px;border-radius:3px;background:rgba(255,255,255,.92)}
+.before .bar5 i{position:absolute;left:38%;top:-3px;width:11px;height:11px;border-radius:50%;background:#fff}
+.before .times{margin-top:6px}
+.before .bot{display:flex;gap:10px;align-items:center;margin-top:8px}
+.before .pc{display:flex;gap:6px;font-size:18px}
+.label{font:600 12px -apple-system;color:#cfd3da;margin:0 0 6px}
+</style></head><body>
+<h1>MeloDock expanded island: before / after</h1>
+<p class="n">True scale: 1 CSS px = 1 pt. Notch 190x34 (dashed), island 612 wide. Hover the progress track and volume track to see the knob/track growth. Reference only; SwiftUI spec is in island-expanded-redesign.md.</p>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="prev" viewBox="0 0 24 24"><path fill="currentColor" d="M5 5h2.2v14H5zM20 5.5v13a.8.8 0 0 1-1.25.66L9.6 12.66a.8.8 0 0 1 0-1.32l9.15-6.5A.8.8 0 0 1 20 5.5z"/></symbol>
+<symbol id="next" viewBox="0 0 24 24"><path fill="currentColor" d="M16.8 5H19v14h-2.2zM4 5.5v13a.8.8 0 0 0 1.25.66l9.15-6.5a.8.8 0 0 0 0-1.32l-9.15-6.5A.8.8 0 0 0 4 5.5z"/></symbol>
+<symbol id="pause" viewBox="0 0 24 24"><path fill="currentColor" d="M6 4.5h4v15H6zM14 4.5h4v15h-4z" /></symbol>
+<symbol id="spk" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5v5h3.5l5 4v-13l-5 4zM15.5 8.5a4.5 4.5 0 0 1 0 7l-1-1.4a2.8 2.8 0 0 0 0-4.2z"/></symbol>
+<symbol id="air" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M8 17H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3"/><path fill="currentColor" d="M12 13l5 7H7z"/></symbol>
+<symbol id="note" viewBox="0 0 24 24"><path fill="currentColor" d="M9 4l10-2v13.5a3.2 3.2 0 1 1-2-3V6.3l-6 1.2V17a3.2 3.2 0 1 1-2-3z"/></symbol>
+</defs></svg>
+
+<h2>Default state</h2>
+<div class="grid">
+<div class="scene"><p class="label">Before (current: content 612x176)</p>
+<div class="stage"><div class="bar"></div>
+<div class="island before"><div class="notchmark">notch</div><div class="c">
+ <div class="top"><div class="art"></div><div class="txt"><div class="title">Midnight City</div><div class="artist">M83</div></div><div class="field" style="min-width:168px">Apple Music &#9662;</div></div>
+ <div class="bar5"><i></i></div><div class="times"><span>1:24</span><span>4:03</span></div>
+ <div class="bot"><div class="pc"><span class="btn sm" style="width:40px;height:40px">&#9198;</span><span>&#9654;</span><span>&#9197;</span></div><span style="flex:1"></span><div class="field">&#128266; ━━━━━━</div><div class="field" style="width:192px">MacBook Pro Speakers</div></div>
+</div></div></div></div>
+
+<div class="scene"><p class="label">After (content 612x188)</p>
+<div class="stage"><div class="bar"></div>
+<div class="island after"><div class="notchmark">notch</div><div class="c">
+ <div class="row1"><div class="art"></div>
+  <div class="txt"><div class="title">Midnight City</div><div class="artist">M83</div></div>
+  <div class="rt"><span class="chip"><svg width="12" height="12"><use href="#note"/></svg>Apple Music<i>&#8645;</i></span>
+   <div class="spec"><b style="height:6px"></b><b style="height:13px"></b><b style="height:9px"></b><b style="height:16px"></b><b style="height:7px"></b></div></div></div>
+ <div class="prog"><div class="track"><div class="fill"></div><div class="knob"></div></div><div class="times"><span>1:24</span><span>4:03</span></div></div>
+ <div class="ctl"><div class="l"><div class="vol"><svg width="16" height="16"><use href="#spk"/></svg><div class="s"></div></div></div>
+  <div class="m"><span class="btn sm"><svg><use href="#prev"/></svg></span><span class="btn pp"><svg><use href="#pause"/></svg></span><span class="btn sm"><svg><use href="#next"/></svg></span></div>
+  <div class="r"><span class="chip"><svg width="14" height="14"><use href="#air"/></svg>MacBook Pro Speakers<i>&#8645;</i></span></div></div>
+</div></div></div></div>
+</div>
+
+<h2>After: variants</h2>
+<div class="grid">
+<div class="scene"><p class="label">Connect (Spotify, not authorized): Connect chip sits left of source chip; progress and transport dim to 35%</p>
+<div class="stage"><div class="bar"></div>
+<div class="island after"><div class="notchmark">notch</div><div class="c">
+ <div class="row1"><div class="art"></div>
+  <div class="txt"><div class="title">Not connected</div><div class="artist">Connect Spotify to see what's playing</div></div>
+  <div class="rt"><div style="display:flex;gap:8px"><span class="chip fill">Connect</span><span class="chip">Spotify<i>&#8645;</i></span></div><div></div></div></div>
+ <div class="prog dim"><div class="track"><div class="fill" style="width:0"></div></div><div class="times"><span>0:00</span><span>0:00</span></div></div>
+ <div class="ctl"><div class="l"><div class="vol"><svg width="16" height="16"><use href="#spk"/></svg><div class="s"></div></div></div>
+  <div class="m dim"><span class="btn sm"><svg><use href="#prev"/></svg></span><span class="btn pp"><svg><use href="#pause"/></svg></span><span class="btn sm"><svg><use href="#next"/></svg></span></div>
+  <div class="r"><span class="chip"><svg width="14" height="14"><use href="#air"/></svg>MacBook Pro Speakers<i>&#8645;</i></span></div></div>
+</div></div></div></div>
+
+<div class="scene"><p class="label">Long title + long output name: both truncate with tail ellipsis, chips never shrink below icon+label cap</p>
+<div class="stage"><div class="bar"></div>
+<div class="island after"><div class="notchmark">notch</div><div class="c">
+ <div class="row1"><div class="art" style="background:linear-gradient(135deg,#2b5876,#4e4376)"></div>
+  <div class="txt"><div class="title">Everything in Its Right Place (Live at the Orpheum Theatre, Remastered Deluxe Edition)</div><div class="artist">Radiohead, Thom Yorke &amp; The London Contemporary Orchestra</div></div>
+  <div class="rt"><span class="chip"><svg width="12" height="12"><use href="#note"/></svg>Apple Music<i>&#8645;</i></span>
+   <div class="spec"><b style="height:9px"></b><b style="height:5px"></b><b style="height:14px"></b><b style="height:8px"></b><b style="height:12px"></b></div></div></div>
+ <div class="prog"><div class="track"><div class="fill" style="width:71%"></div><div class="knob" style="left:71%"></div></div><div class="times"><span>3:09</span><span>4:26</span></div></div>
+ <div class="ctl"><div class="l"><div class="vol"><svg width="16" height="16"><use href="#spk"/></svg><div class="s"></div></div></div>
+  <div class="m"><span class="btn sm"><svg><use href="#prev"/></svg></span><span class="btn pp"><svg><use href="#pause"/></svg></span><span class="btn sm"><svg><use href="#next"/></svg></span></div>
+  <div class="r"><span class="chip" style="max-width:180px"><svg width="14" height="14" style="flex:none"><use href="#air"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pranchai's AirPods Pro (2nd generation)</span></span></div></div>
+</div></div></div></div>
+</div>
+</body></html>
