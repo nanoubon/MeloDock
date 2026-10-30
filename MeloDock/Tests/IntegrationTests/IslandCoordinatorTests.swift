@@ -303,5 +303,65 @@ final class IslandCoordinatorTests: XCTestCase {
         XCTAssertEqual(clock.delays.last ?? -1, 2.5, accuracy: 0.001)
         XCTAssertEqual(c.transient?.id, "volume")
     }
+
+    // MARK: Tabs
+
+    private func timerActivity() -> IslandActivity {
+        IslandActivity(id: "timer", kind: .timer, priority: IslandActivity.Priority.timer, detail: .timer)
+    }
+
+    private func calendarActivity() -> IslandActivity {
+        IslandActivity(id: "calendar", kind: .calendar, priority: IslandActivity.Priority.calendar, detail: .calendar)
+    }
+
+    func testCurrentPageFollowsPrimaryUntilPicked() {
+        let (c, s) = make()
+        s.subject.send([activity("nowPlaying"), timerActivity()])
+        XCTAssertEqual(c.currentPage, .timer)
+        c.expand()
+        c.selectTab(.nowPlaying)
+        XCTAssertEqual(c.selectedTab, .nowPlaying)
+        XCTAssertEqual(c.currentPage, .nowPlaying)
+    }
+
+    func testSelectedTabResetsOnCollapseAndExpand() {
+        let (c, s) = make()
+        s.subject.send([activity("nowPlaying"), timerActivity()])
+        c.expand()
+        c.selectTab(.nowPlaying)
+        c.toggleExpanded()
+        XCTAssertNil(c.selectedTab)
+        c.expand()
+        c.selectTab(.nowPlaying)
+        c.toggleExpanded()
+        c.toggleExpanded()
+        XCTAssertNil(c.selectedTab)
+        XCTAssertEqual(c.currentPage, .timer)
+    }
+
+    func testPickedCalendarDropsWhenEventEnds() {
+        let (c, s) = make()
+        s.subject.send([activity("nowPlaying"), calendarActivity()])
+        XCTAssertEqual(c.tabs, [.nowPlaying, .timer, .calendar])
+        c.expand()
+        c.selectTab(.calendar)
+        XCTAssertEqual(c.currentPage, .calendar)
+        s.subject.send([activity("nowPlaying")])
+        XCTAssertNil(c.selectedTab)
+        XCTAssertEqual(c.currentPage, .nowPlaying)
+    }
+
+    func testSelectingUnavailableTabIsIgnored() {
+        let (c, _) = make()
+        c.selectTab(.calendar)
+        XCTAssertNil(c.selectedTab)
+    }
+
+    func testTimerTabHiddenWhenTimerDisabled() {
+        let (c, _) = make()
+        XCTAssertEqual(c.tabs, [.nowPlaying, .timer])
+        c.enabledKinds = IslandKindFilter.all.subtracting([.timer])
+        XCTAssertEqual(c.tabs, [.nowPlaying])
+    }
 }
 #endif

@@ -4,8 +4,15 @@ enum IslandMode: Equatable { case idle, compact, transient, expanded }
 
 enum IslandShapeMetrics {
     static let earWidth: CGFloat = 56
+    /// Height of the page (player, timer or event) in the expanded island.
+    static let pageHeight: CGFloat = 188
+    /// Height of the tab strip under the page.
+    static let tabStripHeight: CGFloat = 32
     /// Expanded content size; on a notched screen the shape is taller by the notch height.
-    static let expandedSize = CGSize(width: 612, height: 188)
+    static let expandedSize = CGSize(width: 612, height: pageHeight + tabStripHeight)
+    /// Height of the fixed-size island panel: the tallest expanded shape (a 44pt notch is the largest expected)
+    /// plus room for its drop shadow.
+    static let panelHeight: CGFloat = 300
     static let pillSize = CGSize(width: 220, height: 34)
     /// Width of the fixed-size island panel; the shape and the secondary circle must fit inside it.
     static let panelWidth: CGFloat = 640

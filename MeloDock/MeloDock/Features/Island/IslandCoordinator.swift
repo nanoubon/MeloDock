@@ -16,8 +16,17 @@ final class IslandCoordinator: ObservableObject {
     @Published var enabledKinds: Set<IslandActivity.Kind> = IslandKindFilter.all {
         didSet { if enabledKinds != oldValue { applyEnabledKinds(removed: oldValue.subtracting(enabledKinds)) } }
     }
+    /// Tabs available in the expanded island (see `IslandTab`).
+    @Published private(set) var tabs: [IslandActivity.Kind] = IslandTab.tabs(from: [])
+    /// The page the user explicitly picked this expansion; nil means "follow the primary activity".
+    @Published private(set) var selectedTab: IslandActivity.Kind?
     @Published private(set) var transient: IslandTransient?
     @Published private(set) var notch: NotchGeometry?
+
+    /// The page the expanded island shows now.
+    var currentPage: IslandActivity.Kind {
+        IslandTab.page(selection: selection, tabs: tabs, requested: selectedTab)
+    }
 
     var onExpandedChanged: ((Bool) -> Void)?
 
@@ -75,6 +84,15 @@ final class IslandCoordinator: ObservableObject {
     private func recomputeSelection() {
         let enabled = latest.values.flatMap { $0 }.filter { enabledKinds.contains($0.kind) }
         selection = IslandSelection.select(from: enabled)
+        tabs = IslandTab.tabs(from: enabled, timerEnabled: enabledKinds.contains(.timer))
+        // A pick sticks only while its tab exists (e.g. a calendar pick ends with the event).
+        if let picked = selectedTab, !tabs.contains(picked) { selectedTab = nil }
+    }
+
+    /// Explicitly opens a page; ignored when that tab is not available.
+    func selectTab(_ kind: IslandActivity.Kind) {
+        guard tabs.contains(kind) else { return }
+        selectedTab = kind
     }
 
     private func applyEnabledKinds(removed: Set<IslandActivity.Kind>) {
@@ -153,6 +171,7 @@ final class IslandCoordinator: ObservableObject {
     private func setExpanded(_ value: Bool) {
         guard value != isExpanded else { return }
         isExpanded = value
+        selectedTab = nil
         if value { clearTransients() }
         onExpandedChanged?(value)
     }

@@ -9,8 +9,7 @@ import SwiftUI
 final class IslandPanelController {
     private enum Layout {
         static let width: CGFloat = IslandShapeMetrics.panelWidth
-        // Fits the tallest expanded shape (188 + notch height) plus its drop shadow.
-        static let height: CGFloat = 260
+        static let height: CGFloat = IslandShapeMetrics.panelHeight
     }
 
     private let coordinator: IslandCoordinator

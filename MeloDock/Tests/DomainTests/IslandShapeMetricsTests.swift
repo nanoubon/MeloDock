@@ -14,7 +14,19 @@ final class IslandShapeMetricsTests: XCTestCase {
     }
 
     func testExpandedWithNotchAddsNotchHeight() {
-        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch), CGSize(width: 612, height: 220))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch), CGSize(width: 612, height: 252))
+    }
+
+    func testExpandedFitsPanelWithShadowRoomForTallNotch() {
+        let tall = NotchGeometry(centerX: 320, width: 200, height: 44)
+        let height = IslandShapeMetrics.size(for: .expanded, notch: tall).height
+        XCTAssertLessThanOrEqual(height + 24, IslandShapeMetrics.panelHeight)
+        XCTAssertLessThanOrEqual(IslandShapeMetrics.expandedSize.width, IslandShapeMetrics.panelWidth)
+    }
+
+    func testPageAndTabStripFillExpandedContent() {
+        XCTAssertEqual(IslandShapeMetrics.pageHeight + IslandShapeMetrics.tabStripHeight, IslandShapeMetrics.expandedSize.height)
+        XCTAssertGreaterThanOrEqual(IslandShapeMetrics.tabStripHeight, 28)
     }
 
     func testIdleWithoutNotchIsZero() {
@@ -26,7 +38,7 @@ final class IslandShapeMetricsTests: XCTestCase {
     }
 
     func testExpandedWithoutNotch() {
-        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 188))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 220))
     }
 
     func testTransientMatchesCompactSize() {

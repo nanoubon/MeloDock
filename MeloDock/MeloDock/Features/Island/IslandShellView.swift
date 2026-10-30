@@ -93,11 +93,12 @@ struct IslandShellView: View {
                     .transition(.opacity)
             }
         case .expanded:
-            ExpandedMusicView(viewModel: viewModel)
+            ExpandedContainerView(coordinator: coordinator, viewModel: viewModel,
+                                  timerModel: timerModel, calendarSource: calendarSource)
                 .frame(width: IslandShapeMetrics.expandedSize.width, height: IslandShapeMetrics.expandedSize.height)
                 // Keep the player clear of the physical notch.
                 .padding(.top, coordinator.notch?.height ?? 0)
-                // The player staggers its own fade-in; on collapse it fades out quickly as the shape closes.
+                // The music page staggers its own fade-in; on collapse it fades out quickly as the shape closes.
                 .transition(.asymmetric(
                     insertion: .identity,
                     removal: .opacity.animation(reduceMotion ? Motion.reducedContentOut : Motion.contentOut)
