@@ -12,7 +12,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Toggle("Show Overlay on Launch", isOn: $viewModel.showOnStartup)
+                Toggle("Show island", isOn: $viewModel.showOnStartup)
                 Button("Show/Hide Overlay Now") {
                     NotificationCenter.default.post(name: .meloDockToggleOverlay, object: nil)
                 }

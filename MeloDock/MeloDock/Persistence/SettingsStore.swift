@@ -39,7 +39,7 @@ final class SettingsStore: ObservableObject {
         showOnStartup = defaults.object(forKey: Keys.showOnStartup) as? Bool ?? true
         launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         spotifyClientID = defaults.string(forKey: Keys.spotifyClientID) ?? ""
-        overlayVisible = defaults.object(forKey: Keys.overlayVisible) as? Bool ?? false
+        overlayVisible = false // session-only: the island always starts collapsed
 
         if let data = defaults.data(forKey: Keys.hotkey),
            let decoded = try? JSONDecoder().decode(HotkeyConfiguration.self, from: data) {

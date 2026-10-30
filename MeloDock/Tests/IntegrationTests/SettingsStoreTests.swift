@@ -23,5 +23,36 @@ final class SettingsStoreTests: XCTestCase {
 
         defaults.removePersistentDomain(forName: suiteName)
     }
+
+    @MainActor
+    func testOverlayVisibleAlwaysStartsFalse() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Could not create isolated UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(true, forKey: "settings.overlayVisible")
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertFalse(store.overlayVisible)
+
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    @MainActor
+    func testShowOnStartupDefaultsToTrue() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Could not create isolated UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.showOnStartup)
+
+        defaults.removePersistentDomain(forName: suiteName)
+    }
 }
 #endif
