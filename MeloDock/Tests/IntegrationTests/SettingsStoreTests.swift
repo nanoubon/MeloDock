@@ -3,6 +3,7 @@ import XCTest
 @testable import MeloDock
 
 final class SettingsStoreTests: XCTestCase {
+    @MainActor
     func testPersistsProviderAndLaunchAtLoginFlag() {
         let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {

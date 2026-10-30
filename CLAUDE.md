@@ -1,0 +1,57 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+MeloDock is a macOS 14+ menu-bar app (SwiftUI + AppKit, Swift 5, no third-party dependencies) that turns the MacBook notch into a "Now Playing" island: artwork, title/artist, progress, play/pause/next/previous for Apple Music and Spotify, plus system volume and audio-output switching. Toggled by a global hotkey or the status-bar menu; can launch at login. The README is in Thai.
+
+## Build and run
+
+The Xcode project lives one level down: `MeloDock/MeloDock.xcodeproj`, with the app target `MeloDock` (bundle id `com.nano.melodock`), the test target `MeloDockTests`, and one shared scheme `MeloDock`. On this machine `xcode-select` points at the Command Line Tools, which can't build the project, so run `xcodebuild` with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` set (no `sudo` needed). Signing uses "Sign to Run Locally", so no team or extra flags are required.
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project MeloDock/MeloDock.xcodeproj -scheme MeloDock -configuration Debug build
+```
+
+The target uses a file-system-synchronized group (`MeloDock/MeloDock/`), so new `.swift` files placed under that folder are picked up automatically; no `project.pbxproj` edits are needed. The Info.plist is generated from `INFOPLIST_KEY_*` build settings (usage strings for Apple Events and Apple Music live there, not in a plist file).
+
+### Tests
+
+XCTest cases live in `MeloDock/Tests/`, which the `MeloDockTests` target picks up through a file-system-synchronized group, so new test files there are compiled automatically. Run the full suite:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project MeloDock/MeloDock.xcodeproj -scheme MeloDock -destination 'platform=macOS' test
+```
+
+Run a single test with `-only-testing:<Target>/<Class>/<method>`:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project MeloDock/MeloDock.xcodeproj -scheme MeloDock -destination 'platform=macOS' test -only-testing:MeloDockTests/TrackTests/testProgressFractionClampsToOne
+```
+
+- The app hosts the tests (`TEST_HOST`), so `AppDelegate.applicationDidFinishLaunching` runs during a test run: the status item, island panel, hotkey and bootstrap all start.
+- Tests that touch `@MainActor` types (most of the app) must be marked `@MainActor` themselves.
+- `SettingsStore` takes an injectable `UserDefaults`; tests use a throwaway suite name rather than `.standard`.
+
+## Architecture
+
+Code is under `MeloDock/MeloDock/`, layered as `App → Features → Domain ← Integrations/Services/Persistence`.
+
+- **App/**: `MeloDockApp` (SwiftUI `@main`, only defines the `Settings` scene and menu commands) uses `AppDelegate` via `@NSApplicationDelegateAdaptor`. `AppDelegate` owns everything non-SwiftUI: the island panel, the `NSStatusItem` menu, hotkey registration, launch-at-login sync, and forwarding incoming URLs to Spotify. `DIContainer.shared` is a `@MainActor` singleton that constructs every service/provider and lazily builds the two view models; wire new dependencies there.
+- **Domain/**: plain models (`Track`, `PlaybackState`, `AudioOutput`, `MusicProviderKind`, `ProviderAuthState`) and the two seams: `MusicProvider` (`@MainActor`, exposes auth and playback-state Combine publishers plus async control methods) and `AudioDeviceProvider`. `Track.init` clamps progress/duration/tempo, so callers can pass raw provider values.
+- **Integrations/**: the concrete providers.
+  - `AppleMusicProvider` reads the Music app mainly via `NSAppleScript` (Apple Events, run on a private serial queue), merging that with `ApplicationMusicPlayer` (MusicKit) data and the `com.apple.Music.playerInfo` distributed notification. It includes heuristics for stale or "missing value" metadata and transient "not running" AppleEvents errors, and looks up missing artwork over the network with a cache. The root-level `Music.h` is a ScriptingBridge header generated from Music's scripting dictionary, kept as a reference; it is not part of the build.
+  - `SpotifyProvider` uses the Spotify Web API with OAuth PKCE via `ASWebAuthenticationSession` (callback scheme `melodock://spotify-auth`). The client ID is user-entered in Settings (`SettingsStore.spotifyClientID`); tokens are stored with `KeychainService`.
+  - `CoreAudioService` uses the CoreAudio HAL for output-device listing and switching and per-channel volume.
+- **Features/**: MVVM with `ObservableObject` view models.
+  - `Island/`: `IslandPanelController` hosts `IslandView` in a borderless `NSPanel` at `.statusBar` level, positioned over the notch (detected via the screen's auxiliary top areas, with a fallback below the menu bar on non-notched displays). `IslandViewModel` subscribes to the *selected* provider's publishers only (re-subscribed on `switchProvider`), polls `refreshNowPlaying()` every 2s (every 6s while the overlay is hidden), refreshes audio devices at most every 8s, and interpolates `liveProgress` locally at 15 Hz between polls. `MusicSpectrumView` is a synthetic visualizer driven by tempo and a seed from the track id, not real audio analysis.
+  - `Settings/`: SwiftUI settings window and view model.
+- **Persistence/SettingsStore**: `@Published` properties written to `UserDefaults` in `didSet` under `settings.*` keys. Other components react via Combine on its publishers (e.g. `$hotkey` re-registers the hotkey, `$launchAtLogin` updates `SMAppService`, `$overlayVisible` throttles polling).
+- **Services/**: `HotkeyService` (Carbon `RegisterEventHotKey`), `KeychainService`, `LaunchAtLoginService`, `PermissionsService`, and `StoreKitProService`, which is currently only a stub that always reports non-Pro.
+
+## Constraints to keep in mind
+
+- The app is sandboxed (`MeloDock.entitlements`): Apple Events are allowed only for the `com.apple.Music` scripting targets `playback` and `library.read`, plus outgoing network and music-library access. Scripting a new Music command or another app requires updating the entitlements, and possibly the `NSAppleEventsUsageDescription` build setting.
+- Almost everything is `@MainActor` (container, providers, view models, settings store). AppleScript work is the exception: it is `nonisolated static` and dispatched to a background queue.
+- UI strings in code are English, even though the README is Thai.

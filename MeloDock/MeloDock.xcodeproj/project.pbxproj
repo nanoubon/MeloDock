@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		3EC8BD402F49571D00AED5D6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3EC8BD1E2F49571B00AED5D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3EC8BD252F49571B00AED5D6;
+			remoteInfo = MeloDock;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		3EC8BD422F49571D00AED5D6 /* MeloDockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeloDockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EC8BD262F49571B00AED5D6 /* MeloDock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeloDock.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -16,10 +27,22 @@
 			path = MeloDock;
 			sourceTree = "<group>";
 		};
+		3EC8BD432F49571D00AED5D6 /* Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		3EC8BD232F49571B00AED5D6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3EC8BD452F49571D00AED5D6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				3EC8BD282F49571B00AED5D6 /* MeloDock */,
+				3EC8BD432F49571D00AED5D6 /* Tests */,
 				3EC8BD272F49571B00AED5D6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				3EC8BD262F49571B00AED5D6 /* MeloDock.app */,
+				3EC8BD422F49571D00AED5D6 /* MeloDockTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,29 @@
 			productReference = 3EC8BD262F49571B00AED5D6 /* MeloDock.app */;
 			productType = "com.apple.product-type.application";
 		};
+		3EC8BD472F49571D00AED5D6 /* MeloDockTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3EC8BD482F49571D00AED5D6 /* Build configuration list for PBXNativeTarget "MeloDockTests" */;
+			buildPhases = (
+				3EC8BD442F49571D00AED5D6 /* Sources */,
+				3EC8BD452F49571D00AED5D6 /* Frameworks */,
+				3EC8BD462F49571D00AED5D6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3EC8BD412F49571D00AED5D6 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3EC8BD432F49571D00AED5D6 /* Tests */,
+			);
+			name = MeloDockTests;
+			packageProductDependencies = (
+			);
+			productName = MeloDockTests;
+			productReference = 3EC8BD422F49571D00AED5D6 /* MeloDockTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +130,10 @@
 				TargetAttributes = {
 					3EC8BD252F49571B00AED5D6 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					3EC8BD472F49571D00AED5D6 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 3EC8BD252F49571B00AED5D6;
 					};
 				};
 			};
@@ -100,12 +152,20 @@
 			projectRoot = "";
 			targets = (
 				3EC8BD252F49571B00AED5D6 /* MeloDock */,
+				3EC8BD472F49571D00AED5D6 /* MeloDockTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		3EC8BD242F49571B00AED5D6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3EC8BD462F49571D00AED5D6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +182,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3EC8BD442F49571D00AED5D6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3EC8BD412F49571D00AED5D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3EC8BD252F49571B00AED5D6 /* MeloDock */;
+			targetProxy = 3EC8BD402F49571D00AED5D6 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3EC8BD2F2F49571C00AED5D6 /* Debug */ = {
@@ -313,6 +388,46 @@
 			};
 			name = Release;
 		};
+		3EC8BD492F49571D00AED5D6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nano.melodock.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeloDock.app/Contents/MacOS/MeloDock";
+			};
+			name = Debug;
+		};
+		3EC8BD4A2F49571D00AED5D6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nano.melodock.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeloDock.app/Contents/MacOS/MeloDock";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -330,6 +445,15 @@
 			buildConfigurations = (
 				3EC8BD322F49571C00AED5D6 /* Debug */,
 				3EC8BD332F49571C00AED5D6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3EC8BD482F49571D00AED5D6 /* Build configuration list for PBXNativeTarget "MeloDockTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3EC8BD492F49571D00AED5D6 /* Debug */,
+				3EC8BD4A2F49571D00AED5D6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
