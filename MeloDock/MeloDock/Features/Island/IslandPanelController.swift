@@ -9,7 +9,8 @@ import SwiftUI
 final class IslandPanelController {
     private enum Layout {
         static let width: CGFloat = 640
-        static let height: CGFloat = 200
+        // Fits the tallest expanded shape (176 + notch height) with margin.
+        static let height: CGFloat = 240
     }
 
     private let coordinator: IslandCoordinator
@@ -21,15 +22,16 @@ final class IslandPanelController {
 
     init(coordinator: IslandCoordinator, viewModel: IslandViewModel) {
         self.coordinator = coordinator
-        panel = IslandPanel(
+        panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
-        panel.level = .statusBar
+        // Setting isFloatingPanel resets the level to .floating, so it must come before `level`.
         panel.isFloatingPanel = true
+        panel.level = .statusBar
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -216,13 +218,6 @@ final class IslandPanelController {
 
     private func clamp(_ value: CGFloat, min minValue: CGFloat, max maxValue: CGFloat) -> CGFloat {
         Swift.max(minValue, Swift.min(value, maxValue))
-    }
-}
-
-/// AppKit constrains a visible window to below the menu bar; the island must sit over the notch.
-private final class IslandPanel: NSPanel {
-    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
-        frameRect
     }
 }
 

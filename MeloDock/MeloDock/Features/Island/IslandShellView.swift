@@ -48,6 +48,8 @@ struct IslandShellView: View {
         case .expanded:
             ExpandedMusicView(viewModel: viewModel)
                 .frame(width: IslandShapeMetrics.expandedSize.width, height: IslandShapeMetrics.expandedSize.height)
+                // Keep the player clear of the physical notch.
+                .padding(.top, coordinator.notch?.height ?? 0)
                 .transition(.opacity)
         }
     }
