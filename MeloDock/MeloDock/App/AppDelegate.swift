@@ -29,7 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onExpandedChanged = { [weak self] expanded in
             self?.container.settingsStore.overlayVisible = expanded
         }
-        panelController = IslandPanelController(coordinator: coordinator, viewModel: container.islandViewModel)
+        panelController = IslandPanelController(
+            coordinator: coordinator, viewModel: container.islandViewModel,
+            timerModel: container.timerModel, calendarSource: container.calendarActivitySource)
     }
 
     private func configureStatusItem() {

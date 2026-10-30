@@ -20,7 +20,8 @@ final class IslandPanelController {
     /// Last hover state reported to the coordinator; changes only on real mouse movement (or an exit).
     private var pointerInside = false
 
-    init(coordinator: IslandCoordinator, viewModel: IslandViewModel) {
+    init(coordinator: IslandCoordinator, viewModel: IslandViewModel,
+         timerModel: TimerModel, calendarSource: CalendarActivitySource) {
         self.coordinator = coordinator
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height),
@@ -47,7 +48,8 @@ final class IslandPanelController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = true
 
-        let hostingView = NSHostingView(rootView: IslandShellView(coordinator: coordinator, viewModel: viewModel))
+        let hostingView = NSHostingView(rootView: IslandShellView(
+            coordinator: coordinator, viewModel: viewModel, timerModel: timerModel, calendarSource: calendarSource))
         // The panel keeps a fixed size; the island shape animates inside it.
         hostingView.sizingOptions = []
         hostingView.frame = NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height)

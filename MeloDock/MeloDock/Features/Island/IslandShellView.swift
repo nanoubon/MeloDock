@@ -29,6 +29,8 @@ struct IslandShellView: View {
 
     @ObservedObject var coordinator: IslandCoordinator
     let viewModel: IslandViewModel
+    let timerModel: TimerModel
+    let calendarSource: CalendarActivitySource
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The mode the shape last settled toward; tells a collapse apart from idle/compact changes.
@@ -110,6 +112,10 @@ struct IslandShellView: View {
             CompactNowPlayingView(viewModel: viewModel)
         case let .capture(mic, camera):
             CompactCaptureView(mic: mic, camera: camera)
+        case .timer:
+            CompactTimerView(model: timerModel)
+        case .calendar:
+            CompactCalendarView(source: calendarSource)
         case .empty:
             Color.clear
         }

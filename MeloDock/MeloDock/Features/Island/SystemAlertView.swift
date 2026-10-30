@@ -41,9 +41,8 @@ struct SystemAlertContent: Equatable {
                 symbol: "hifispeaker.fill", tone: .neutral, trailing: .text(name),
                 accessibilityLabel: "Audio output \(name)")
         case .timerDone:
-            // Placeholder until the timer feature defines its own notice.
             return SystemAlertContent(
-                symbol: "timer", tone: .warning, trailing: .text("Done"), accessibilityLabel: "Timer done")
+                symbol: "alarm.fill", tone: .warning, trailing: .text("Done"), accessibilityLabel: "Timer done")
         }
     }
 

@@ -25,7 +25,8 @@ final class DIContainer: ObservableObject {
 
     lazy var islandCoordinator: IslandCoordinator = {
         let coordinator = IslandCoordinator(
-            sources: [nowPlayingActivitySource, powerActivitySource, audioActivitySource, captureActivitySource],
+            sources: [nowPlayingActivitySource, powerActivitySource, audioActivitySource, captureActivitySource,
+                      timerActivitySource, calendarActivitySource],
             isIslandEnabled: settingsStore.showOnStartup
         )
         settingsStore.$showOnStartup
@@ -50,6 +51,14 @@ final class DIContainer: ObservableObject {
 
     // Constructing it does not prompt; access is only requested from the Settings Calendar switch.
     lazy var calendarService = CalendarService()
+
+    // In-memory only. Held strongly here: the sources keep just subscriptions to it.
+    lazy var timerModel = TimerModel()
+
+    private lazy var timerActivitySource = TimerActivitySource(model: timerModel)
+
+    // Inert until calendar access is granted from Settings; never prompts by itself.
+    lazy var calendarActivitySource = CalendarActivitySource(provider: calendarService)
 
     // Held here because the coordinator only keeps its subscription, not the source.
     private lazy var nowPlayingActivitySource = NowPlayingActivitySource(

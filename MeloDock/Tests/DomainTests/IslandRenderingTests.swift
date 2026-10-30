@@ -51,6 +51,8 @@ final class IslandRenderingTests: XCTestCase {
     func testOutputAndTimerDone() {
         XCTAssertEqual(make(.output(name: "Speakers")).trailing, .text("Speakers"))
         XCTAssertEqual(make(.timerDone).trailing, .text("Done"))
+        XCTAssertEqual(make(.timerDone).accessibilityLabel, "Timer done")
+        XCTAssertEqual(make(.timerDone).symbol, "alarm.fill")
     }
 
     func testCaptureEars() {
@@ -66,7 +68,11 @@ final class IslandRenderingTests: XCTestCase {
         let timer = IslandActivity(id: "t", kind: .timer, priority: 100, detail: .timer)
         XCTAssertEqual(CompactContent.make(for: playing), .nowPlaying)
         XCTAssertEqual(CompactContent.make(for: capture), .capture(mic: true, camera: false))
-        XCTAssertEqual(CompactContent.make(for: timer), .empty)
+        let calendar = IslandActivity(id: "calendar", kind: .calendar, priority: 80, detail: .calendar)
+        let power = IslandActivity(id: "power", kind: .power, priority: 10)
+        XCTAssertEqual(CompactContent.make(for: timer), .timer)
+        XCTAssertEqual(CompactContent.make(for: calendar), .calendar)
+        XCTAssertEqual(CompactContent.make(for: power), .empty)
         XCTAssertEqual(CompactContent.make(for: nil), .empty)
     }
 }
