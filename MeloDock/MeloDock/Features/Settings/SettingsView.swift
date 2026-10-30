@@ -22,6 +22,25 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Island") {
+                Toggle("Power and battery", isOn: $viewModel.showPower)
+                Toggle("Audio and Bluetooth", isOn: $viewModel.showAudio)
+                Toggle("Microphone in use", isOn: $viewModel.showCapture)
+                Toggle("Timer", isOn: $viewModel.showTimer)
+                Toggle("Calendar", isOn: Binding(
+                    get: { viewModel.showCalendar },
+                    set: { enabled in Task { await viewModel.setCalendarEnabled(enabled) } }
+                ))
+                if viewModel.calendarAccessDenied {
+                    Text("Calendar access is turned off for MeloDock.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Button("Open System Settings") {
+                        viewModel.openCalendarPrivacySettings()
+                    }
+                }
+            }
+
             Section("Apple Music") {
                 providerStatusRow(viewModel.appleMusicAuthState)
                 Button("Connect Apple Music") {

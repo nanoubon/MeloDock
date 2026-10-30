@@ -43,9 +43,13 @@ final class DIContainer: ObservableObject {
             launchAtLoginService: launchAtLoginService,
             musicProviders: musicProviders,
             spotifyProvider: spotifyProvider,
-            proFeatureService: proFeatureService
+            proFeatureService: proFeatureService,
+            calendarAccess: calendarService
         )
     }()
+
+    // Constructing it does not prompt; access is only requested from the Settings Calendar switch.
+    lazy var calendarService = CalendarService()
 
     // Held here because the coordinator only keeps its subscription, not the source.
     private lazy var nowPlayingActivitySource = NowPlayingActivitySource(

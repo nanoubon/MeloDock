@@ -23,22 +23,33 @@ private final class FakeAudio: AudioDeviceProvider {
 
 final class IslandKindFilterTests: XCTestCase {
     func testAllOnEnablesEveryKind() {
-        XCTAssertEqual(IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true),
+        XCTAssertEqual(IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true, showTimer: true, showCalendar: true),
                        IslandKindFilter.all)
     }
 
     func testEachSwitchGatesOnlyItsKind() {
-        let noPower = IslandKindFilter.enabledKinds(showPower: false, showAudio: true, showCapture: true)
+        let noPower = IslandKindFilter.enabledKinds(showPower: false, showAudio: true, showCapture: true, showTimer: true, showCalendar: true)
         XCTAssertFalse(noPower.contains(.power))
         XCTAssertTrue(noPower.contains(.audio) && noPower.contains(.capture) && noPower.contains(.nowPlaying))
 
-        let noAudio = IslandKindFilter.enabledKinds(showPower: true, showAudio: false, showCapture: true)
+        let noAudio = IslandKindFilter.enabledKinds(showPower: true, showAudio: false, showCapture: true, showTimer: true, showCalendar: true)
         XCTAssertFalse(noAudio.contains(.audio))
         XCTAssertTrue(noAudio.contains(.power))
 
-        let noCapture = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false)
+        let noCapture = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false, showTimer: true, showCalendar: true)
         XCTAssertFalse(noCapture.contains(.capture))
         XCTAssertTrue(noCapture.contains(.timer) && noCapture.contains(.calendar))
+    }
+
+    func testTimerAndCalendarSwitchesGateTheirKinds() {
+        let noTimer = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true,
+                                                    showTimer: false, showCalendar: true)
+        XCTAssertFalse(noTimer.contains(.timer))
+        XCTAssertTrue(noTimer.contains(.calendar) && noTimer.contains(.power))
+        let noCalendar = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true,
+                                                       showTimer: true, showCalendar: false)
+        XCTAssertFalse(noCalendar.contains(.calendar))
+        XCTAssertTrue(noCalendar.contains(.timer) && noCalendar.contains(.nowPlaying))
     }
 
     func testTransientQueueRemoveKind() {
@@ -67,13 +78,17 @@ final class IslandKindFilterTests: XCTestCase {
         let store = SettingsStore(defaults: defaults)
         var latest: Set<IslandActivity.Kind>?
         let c = store.enabledKindsPublisher.sink { latest = $0 }
-        XCTAssertEqual(latest, IslandKindFilter.all)
+        XCTAssertEqual(latest, IslandKindFilter.all.subtracting([.calendar]))
         store.showAudio = false
         XCTAssertEqual(latest?.contains(.audio), false)
         store.showAudio = true
         store.showCapture = false
         XCTAssertEqual(latest?.contains(.capture), false)
         XCTAssertEqual(latest?.contains(.audio), true)
+        store.showTimer = false
+        XCTAssertEqual(latest?.contains(.timer), false)
+        store.showCalendar = true
+        XCTAssertEqual(latest?.contains(.calendar), true)
         c.cancel()
     }
 }
@@ -93,7 +108,7 @@ final class IslandWiringTests: XCTestCase {
         let c = IslandCoordinator(sources: [s])
         s.subject.send([capture, playing])
         XCTAssertEqual(c.selection.secondary?.id, "capture")
-        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false)
+        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false, showTimer: true, showCalendar: true)
         XCTAssertNil(c.selection.secondary)
         XCTAssertEqual(c.selection.primary?.id, "nowPlaying")
         c.enabledKinds = IslandKindFilter.all
@@ -105,14 +120,14 @@ final class IslandWiringTests: XCTestCase {
         let c = IslandCoordinator(sources: [s])
         s.subject.send([capture])
         XCTAssertEqual(c.mode, .compact)
-        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false)
+        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: false, showTimer: true, showCalendar: true)
         XCTAssertEqual(c.mode, .idle)
     }
 
     func testDisabledKindTransientsAreDropped() {
         let s = StubSource()
         let c = IslandCoordinator(sources: [s])
-        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: false, showAudio: false, showCapture: true)
+        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: false, showAudio: false, showCapture: true, showTimer: true, showCalendar: true)
         s.transients.send(transient("p", .power))
         s.transients.send(transient("a", .audio))
         XCTAssertNil(c.transient)
@@ -127,9 +142,9 @@ final class IslandWiringTests: XCTestCase {
         s.transients.send(transient("a", .audio))
         s.transients.send(transient("p", .power))
         XCTAssertEqual(c.transient?.id, "a")
-        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: false, showCapture: true)
+        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: true, showAudio: false, showCapture: true, showTimer: true, showCalendar: true)
         XCTAssertEqual(c.transient?.id, "p")
-        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: false, showAudio: false, showCapture: true)
+        c.enabledKinds = IslandKindFilter.enabledKinds(showPower: false, showAudio: false, showCapture: true, showTimer: true, showCalendar: true)
         XCTAssertNil(c.transient)
     }
 

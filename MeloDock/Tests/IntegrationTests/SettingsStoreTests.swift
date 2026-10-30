@@ -96,5 +96,35 @@ final class SettingsStoreTests: XCTestCase {
 
         defaults.removePersistentDomain(forName: suiteName)
     }
+
+    @MainActor
+    func testTimerDefaultsOnAndCalendarDefaultsOff() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.showTimer)
+        XCTAssertFalse(store.showCalendar)
+    }
+
+    @MainActor
+    func testTimerAndCalendarPersistUnderTheirKeys() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults)
+        store.showTimer = false
+        store.showCalendar = true
+        XCTAssertEqual(defaults.object(forKey: "settings.island.timer") as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: "settings.island.calendar") as? Bool, true)
+
+        let reloaded = SettingsStore(defaults: defaults)
+        XCTAssertFalse(reloaded.showTimer)
+        XCTAssertTrue(reloaded.showCalendar)
+    }
 }
 #endif

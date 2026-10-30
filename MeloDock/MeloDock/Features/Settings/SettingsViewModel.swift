@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -7,6 +8,13 @@ final class SettingsViewModel: ObservableObject {
     @Published var showOnStartup: Bool
     @Published var launchAtLogin: Bool
     @Published var spotifyClientID: String
+    @Published var showPower: Bool
+    @Published var showAudio: Bool
+    @Published var showCapture: Bool
+    @Published var showTimer: Bool
+    /// Changed only through `setCalendarEnabled`, so it never turns on without permission.
+    @Published private(set) var showCalendar: Bool
+    @Published private(set) var calendarAccessDenied = false
 
     @Published private(set) var appleMusicAuthState: ProviderAuthState = .unknown
     @Published private(set) var spotifyAuthState: ProviderAuthState = .unknown
@@ -20,6 +28,8 @@ final class SettingsViewModel: ObservableObject {
     private let musicProviders: [MusicProviderKind: MusicProvider]
     private let spotifyProvider: SpotifyProvider
     private let proFeatureService: ProFeatureService
+    private let calendarAccess: CalendarAccessProviding
+    private let openURL: (URL) -> Void
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -28,18 +38,27 @@ final class SettingsViewModel: ObservableObject {
         launchAtLoginService: LaunchAtLoginService,
         musicProviders: [MusicProviderKind: MusicProvider],
         spotifyProvider: SpotifyProvider,
-        proFeatureService: ProFeatureService
+        proFeatureService: ProFeatureService,
+        calendarAccess: CalendarAccessProviding,
+        openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }
     ) {
         self.settingsStore = settingsStore
         self.launchAtLoginService = launchAtLoginService
         self.musicProviders = musicProviders
         self.spotifyProvider = spotifyProvider
         self.proFeatureService = proFeatureService
+        self.calendarAccess = calendarAccess
+        self.openURL = openURL
 
         preferredProvider = settingsStore.preferredProvider
         showOnStartup = settingsStore.showOnStartup
         launchAtLogin = settingsStore.launchAtLogin
         spotifyClientID = settingsStore.spotifyClientID
+        showPower = settingsStore.showPower
+        showAudio = settingsStore.showAudio
+        showCapture = settingsStore.showCapture
+        showTimer = settingsStore.showTimer
+        showCalendar = settingsStore.showCalendar
 
         bindSettings()
         bindServices()
@@ -79,6 +98,34 @@ final class SettingsViewModel: ObservableObject {
         Task { await refreshProviderStates() }
     }
 
+    /// Turning Calendar on asks for access first; if it is denied the switch stays off and a note is shown.
+    func setCalendarEnabled(_ enabled: Bool) async {
+        guard enabled else {
+            applyCalendar(false)
+            calendarAccessDenied = false
+            return
+        }
+
+        let granted: Bool
+        switch calendarAccess.authorizationStatus {
+        case .authorized: granted = true
+        case .denied: granted = false // the system will not prompt again
+        case .notDetermined: granted = await calendarAccess.requestAccess()
+        }
+        applyCalendar(granted)
+        calendarAccessDenied = !granted
+    }
+
+    func openCalendarPrivacySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") else { return }
+        openURL(url)
+    }
+
+    private func applyCalendar(_ value: Bool) {
+        showCalendar = value
+        settingsStore.showCalendar = value
+    }
+
     func resetHotkey() {
         settingsStore.hotkey = .default
     }
@@ -100,6 +147,26 @@ final class SettingsViewModel: ObservableObject {
             .sink { [weak self] value in
                 self?.settingsStore.showOnStartup = value
             }
+            .store(in: &cancellables)
+
+        $showPower
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showPower = $0 }
+            .store(in: &cancellables)
+
+        $showAudio
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showAudio = $0 }
+            .store(in: &cancellables)
+
+        $showCapture
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showCapture = $0 }
+            .store(in: &cancellables)
+
+        $showTimer
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showTimer = $0 }
             .store(in: &cancellables)
 
         $launchAtLogin
@@ -157,6 +224,15 @@ final class SettingsViewModel: ObservableObject {
         musicProviders[.spotify]?.authStatePublisher
             .sink { [weak self] state in
                 self?.spotifyAuthState = state
+            }
+            .store(in: &cancellables)
+
+        // Access revoked in System Settings while Calendar is on: switch it off and explain.
+        calendarAccess.authorizationStatusPublisher
+            .sink { [weak self] status in
+                guard let self, status == .denied, self.showCalendar else { return }
+                self.applyCalendar(false)
+                self.calendarAccessDenied = true
             }
             .store(in: &cancellables)
 

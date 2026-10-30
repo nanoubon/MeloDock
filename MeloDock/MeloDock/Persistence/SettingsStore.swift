@@ -42,6 +42,15 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(showCapture, forKey: Keys.showCapture) }
     }
 
+    @Published var showTimer: Bool {
+        didSet { defaults.set(showTimer, forKey: Keys.showTimer) }
+    }
+
+    /// Only turned on after the user grants calendar access (see `SettingsViewModel.setCalendarEnabled`).
+    @Published var showCalendar: Bool {
+        didSet { defaults.set(showCalendar, forKey: Keys.showCalendar) }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -54,6 +63,8 @@ final class SettingsStore: ObservableObject {
         showPower = defaults.object(forKey: Keys.showPower) as? Bool ?? true
         showAudio = defaults.object(forKey: Keys.showAudio) as? Bool ?? true
         showCapture = defaults.object(forKey: Keys.showCapture) as? Bool ?? true
+        showTimer = defaults.object(forKey: Keys.showTimer) as? Bool ?? true
+        showCalendar = defaults.object(forKey: Keys.showCalendar) as? Bool ?? false
         overlayVisible = false // session-only: the island always starts collapsed
 
         if let data = defaults.data(forKey: Keys.hotkey),
@@ -75,4 +86,6 @@ private enum Keys {
     static let showPower = "settings.island.power"
     static let showAudio = "settings.island.audio"
     static let showCapture = "settings.island.capture"
+    static let showTimer = "settings.island.timer"
+    static let showCalendar = "settings.island.calendar"
 }

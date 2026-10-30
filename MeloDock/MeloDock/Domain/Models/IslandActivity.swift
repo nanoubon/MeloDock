@@ -45,13 +45,16 @@ struct IslandSelection: Equatable {
     }
 }
 
-/// Which activity kinds the user has switched on. Kinds without a Settings switch are always enabled.
+/// Which activity kinds the user has switched on. Now playing has no switch and is always enabled.
 enum IslandKindFilter {
-    static func enabledKinds(showPower: Bool, showAudio: Bool, showCapture: Bool) -> Set<IslandActivity.Kind> {
+    static func enabledKinds(showPower: Bool, showAudio: Bool, showCapture: Bool,
+                             showTimer: Bool, showCalendar: Bool) -> Set<IslandActivity.Kind> {
         var kinds = Set(IslandActivity.Kind.allCases)
         if !showPower { kinds.remove(.power) }
         if !showAudio { kinds.remove(.audio) }
         if !showCapture { kinds.remove(.capture) }
+        if !showTimer { kinds.remove(.timer) }
+        if !showCalendar { kinds.remove(.calendar) }
         return kinds
     }
 
