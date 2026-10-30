@@ -39,7 +39,8 @@ struct IslandShellView: View {
     var body: some View {
         let mode = coordinator.mode
         let isExpanded = mode == .expanded
-        let size = IslandShapeMetrics.size(for: mode, notch: coordinator.notch)
+        let size = IslandShapeMetrics.size(for: mode, notch: coordinator.notch,
+                                           transient: coordinator.transient?.payload)
         let shape = NotchShape(bottomRadius: bottomRadius(for: mode))
 
         ZStack(alignment: .top) {
@@ -87,7 +88,8 @@ struct IslandShellView: View {
                 .transition(.opacity)
         case .transient:
             if let transient = coordinator.transient {
-                let size = IslandShapeMetrics.size(for: .transient, notch: coordinator.notch)
+                let size = IslandShapeMetrics.size(for: .transient, notch: coordinator.notch,
+                                                   transient: transient.payload)
                 SystemAlertView(transient: transient)
                     .frame(width: size.width, height: size.height)
                     .transition(.opacity)

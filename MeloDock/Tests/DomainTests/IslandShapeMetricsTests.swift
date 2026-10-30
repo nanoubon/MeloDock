@@ -41,11 +41,50 @@ final class IslandShapeMetricsTests: XCTestCase {
         XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: nil), CGSize(width: 612, height: 220))
     }
 
-    func testTransientMatchesCompactSize() {
+    func testStandardTransientMatchesCompactSize() {
+        for payload in [IslandTransient.Payload.volume(0.5), .charging(percent: 5, isCharging: true), .timerDone, .batteryLow(percent: 20)] {
+            XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: notch, transient: payload),
+                           IslandShapeMetrics.size(for: .compact, notch: notch))
+            XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: nil, transient: payload),
+                           IslandShapeMetrics.size(for: .compact, notch: nil))
+        }
         XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: notch),
                        IslandShapeMetrics.size(for: .compact, notch: notch))
-        XCTAssertEqual(IslandShapeMetrics.size(for: .transient, notch: nil),
-                       IslandShapeMetrics.size(for: .compact, notch: nil))
+    }
+
+    func testNamePayloadsWidenTransientBothEars() {
+        let compact = IslandShapeMetrics.size(for: .compact, notch: notch)
+        let extra = 2 * (IslandShapeMetrics.nameEarWidth - IslandShapeMetrics.earWidth)
+        for payload in [IslandTransient.Payload.bluetooth(name: "AirPods Pro", connected: true), .output(name: "MacBook Speakers")] {
+            let size = IslandShapeMetrics.size(for: .transient, notch: notch, transient: payload)
+            XCTAssertEqual(size.width, compact.width + extra)
+            XCTAssertEqual(size.height, compact.height)
+        }
+        XCTAssertGreaterThan(IslandShapeMetrics.nameEarWidth, IslandShapeMetrics.earWidth)
+    }
+
+    func testPayloadIgnoredOutsideTransientMode() {
+        let name = IslandTransient.Payload.output(name: "X")
+        XCTAssertEqual(IslandShapeMetrics.size(for: .compact, notch: notch, transient: name),
+                       IslandShapeMetrics.size(for: .compact, notch: notch))
+    }
+
+    func testWidenedTransientAndSecondaryStayInsidePanel() {
+        let panelFrame = CGRect(x: 0, y: 0, width: IslandShapeMetrics.panelWidth, height: IslandShapeMetrics.panelHeight)
+        let name = IslandTransient.Payload.bluetooth(name: "A very long headphone name", connected: true)
+        for width in [180.0, 200, 240, 300] {
+            let wide = NotchGeometry(centerX: 320, width: width, height: 38)
+            let island = IslandShapeMetrics.hitRect(panelFrame: panelFrame,
+                                                    size: IslandShapeMetrics.size(for: .transient, notch: wide, transient: name))
+            XCTAssertGreaterThanOrEqual(island.minX, panelFrame.minX, "notch width \(width)")
+            let frame = IslandShapeMetrics.secondaryFrame(panelFrame: panelFrame, mode: .transient, notch: wide,
+                                                          hasSecondary: true, transient: name)
+            XCTAssertNotNil(frame)
+            XCTAssertLessThanOrEqual(frame!.maxX, panelFrame.maxX, "notch width \(width)")
+        }
+        let pill = IslandShapeMetrics.secondaryFrame(panelFrame: panelFrame, mode: .transient, notch: nil,
+                                                     hasSecondary: true, transient: name)
+        XCTAssertLessThanOrEqual(pill!.maxX, panelFrame.maxX)
     }
 
     func testHitRectIsCenteredAndTopFlush() {

@@ -69,16 +69,17 @@ struct SystemAlertView: View {
 
     var body: some View {
         let content = SystemAlertContent.make(from: transient)
+        let ear = IslandShapeMetrics.transientEarWidth(for: transient.payload)
         HStack(spacing: 0) {
             Image(systemName: content.symbol)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint(content.tone))
-                .frame(width: IslandShapeMetrics.earWidth)
+                .frame(width: ear)
 
             Spacer(minLength: 0)
 
             trailing(content.trailing, tone: content.tone)
-                .frame(width: IslandShapeMetrics.earWidth)
+                .frame(width: ear)
         }
         .frame(maxHeight: .infinity)
         .accessibilityElement(children: .ignore)

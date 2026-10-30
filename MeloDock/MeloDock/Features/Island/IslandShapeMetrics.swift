@@ -33,6 +33,27 @@ enum IslandShapeMetrics {
         }
     }
 
+    /// Ear width while a transient shows. Notices carrying a device name get wider ears so long Bluetooth and
+    /// output names are not cut off; every other notice keeps the standard ear.
+    static let nameEarWidth: CGFloat = 100
+
+    static func transientEarWidth(for payload: IslandTransient.Payload?) -> CGFloat {
+        switch payload {
+        case .bluetooth, .output: nameEarWidth
+        default: earWidth
+        }
+    }
+
+    /// Like `size(for:notch:)`, but a transient showing a name payload widens both ears (the shape stays centered
+    /// on the notch). `transient` is ignored outside `.transient` mode.
+    static func size(for mode: IslandMode, notch: NotchGeometry?, transient: IslandTransient.Payload?) -> CGSize {
+        var base = size(for: mode, notch: notch)
+        if mode == .transient {
+            base.width += 2 * (transientEarWidth(for: transient) - earWidth)
+        }
+        return base
+    }
+
     /// `size` centered horizontally on the panel and flush with its top edge (maxY).
     static func hitRect(panelFrame: CGRect, size: CGSize) -> CGRect {
         CGRect(x: panelFrame.midX - size.width / 2,
@@ -48,9 +69,9 @@ enum IslandShapeMetrics {
     /// Where the secondary circle sits, in screen coordinates, or nil when it is not shown.
     /// It appears only beside the collapsed island (compact or transient) and only when there is a second activity.
     static func secondaryFrame(panelFrame: CGRect, mode: IslandMode, notch: NotchGeometry?,
-                               hasSecondary: Bool) -> CGRect? {
+                               hasSecondary: Bool, transient: IslandTransient.Payload? = nil) -> CGRect? {
         guard hasSecondary, mode == .compact || mode == .transient else { return nil }
-        let island = hitRect(panelFrame: panelFrame, size: size(for: mode, notch: notch))
+        let island = hitRect(panelFrame: panelFrame, size: size(for: mode, notch: notch, transient: transient))
         let diameter = secondaryCircleSize(notch: notch)
         return CGRect(x: island.maxX + secondaryGap, y: island.maxY - diameter, width: diameter, height: diameter)
     }
