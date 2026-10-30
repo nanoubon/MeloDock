@@ -23,6 +23,17 @@ final class DIContainer: ObservableObject {
         )
     }()
 
+    lazy var islandCoordinator: IslandCoordinator = {
+        let coordinator = IslandCoordinator(
+            sources: [nowPlayingActivitySource],
+            isIslandEnabled: settingsStore.showOnStartup
+        )
+        settingsStore.$showOnStartup
+            .removeDuplicates()
+            .assign(to: &coordinator.$isIslandEnabled)
+        return coordinator
+    }()
+
     lazy var settingsViewModel: SettingsViewModel = {
         SettingsViewModel(
             settingsStore: settingsStore,
@@ -32,6 +43,11 @@ final class DIContainer: ObservableObject {
             proFeatureService: proFeatureService
         )
     }()
+
+    // Held here because the coordinator only keeps its subscription, not the source.
+    private lazy var nowPlayingActivitySource = NowPlayingActivitySource(
+        playbackStates: islandViewModel.$playbackState.eraseToAnyPublisher()
+    )
 
     private lazy var musicProviders: [MusicProviderKind: MusicProvider] = [
         .appleMusic: appleMusicProvider,

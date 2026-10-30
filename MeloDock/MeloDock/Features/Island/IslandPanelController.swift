@@ -1,25 +1,27 @@
 import AppKit
+import Combine
 import CoreGraphics
-import QuartzCore
 import SwiftUI
 
+/// One transparent panel anchored at the notch that hosts the island shell.
+/// Areas outside the island shape pass clicks through to the menu bar below.
+@MainActor
 final class IslandPanelController {
     private enum Layout {
-        static let width: CGFloat = 612
-        static let height: CGFloat = 176
-        static let cornerRadius: CGFloat = 26
-        static let topPadding: CGFloat = 2
-        static let horizontalPadding: CGFloat = 8
+        static let width: CGFloat = 640
+        static let height: CGFloat = 200
     }
 
+    private let coordinator: IslandCoordinator
     private let panel: NSPanel
-    private let hostingController: NSHostingController<AnyView>
+    private var cancellables = Set<AnyCancellable>()
+    private var mouseMonitors: [Any] = []
+    private var pointerInside = false
     private var didApplyInitialShowReposition = false
-    var onVisibilityChanged: ((Bool) -> Void)?
 
-    init<V: View>(rootView: V) {
-        hostingController = NSHostingController(rootView: AnyView(rootView))
-        panel = NSPanel(
+    init(coordinator: IslandCoordinator, viewModel: IslandViewModel) {
+        self.coordinator = coordinator
+        panel = IslandPanel(
             contentRect: NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -40,14 +42,14 @@ final class IslandPanelController {
         panel.becomesKeyOnlyIfNeeded = true
         panel.animationBehavior = .utilityWindow
         panel.isMovableByWindowBackground = false
-        panel.contentViewController = hostingController
+        panel.acceptsMouseMovedEvents = true
+        panel.ignoresMouseEvents = true
 
-        if let contentView = panel.contentView {
-            configureLayerClipping(for: contentView)
-        }
-
-        configureLayerClipping(for: hostingController.view)
-        applyShapeMask()
+        let hostingView = NSHostingView(rootView: IslandShellView(coordinator: coordinator, viewModel: viewModel))
+        // The panel keeps a fixed size; the island shape animates inside it.
+        hostingView.sizingOptions = []
+        hostingView.frame = NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height)
+        panel.contentView = hostingView
 
         NotificationCenter.default.addObserver(
             self,
@@ -55,24 +57,85 @@ final class IslandPanelController {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
-        NotificationCenter.default.addObserver(
+        NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(reposition),
             name: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil
         )
 
+        installMouseMonitors()
+        observeCoordinator()
         reposition()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        mouseMonitors.forEach { NSEvent.removeMonitor($0) }
     }
 
-    func show() {
+    @objc private func reposition() {
+        guard let screen = preferredScreen() else { return }
+
+        let fallbackCenterX = screen.visibleFrame.midX
+        let notch = notchGeometry(for: screen)
+        if notch != coordinator.notch {
+            coordinator.updateNotch(notch)
+        }
+
+        let centerX = notch?.centerX ?? fallbackCenterX
+        let x = clamp(
+            centerX - Layout.width / 2,
+            min: screen.frame.minX,
+            max: screen.frame.maxX - Layout.width
+        )
+
+        // On notched displays we anchor to the very top screen edge.
+        // On non-notched displays we stay below the menu bar.
+        let topReference = notch != nil ? screen.frame.maxY : screen.visibleFrame.maxY
+        panel.setFrameOrigin(NSPoint(x: x, y: topReference - Layout.height))
+        updatePointer()
+    }
+
+    private func observeCoordinator() {
+        // @Published emits before the property changes; hop to the next run loop pass so `mode` is current.
+        Publishers.Merge4(
+            coordinator.$selection.map { _ in () },
+            coordinator.$isExpanded.map { _ in () },
+            coordinator.$isIslandEnabled.map { _ in () },
+            coordinator.$notch.map { _ in () }
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] in
+            self?.updateVisibility()
+        }
+        .store(in: &cancellables)
+    }
+
+    private func updateVisibility() {
+        let hidden = (coordinator.mode == .idle && coordinator.notch == nil)
+            || (!coordinator.isIslandEnabled && !coordinator.isExpanded)
+
+        if hidden {
+            panel.orderOut(nil)
+            panel.ignoresMouseEvents = true
+            if pointerInside {
+                pointerInside = false
+                coordinator.pointerExited()
+            }
+            return
+        }
+
+        if !panel.isVisible {
+            show()
+        }
+        updatePointer()
+    }
+
+    private func show() {
         panel.orderFrontRegardless()
         reposition()
-        applyShapeMask()
 
         // First launch can report stale geometry; re-apply centering on next runloop ticks.
         if didApplyInitialShowReposition == false {
@@ -80,98 +143,56 @@ final class IslandPanelController {
 
             DispatchQueue.main.async { [weak self] in
                 self?.reposition()
-                self?.applyShapeMask()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
                 self?.reposition()
-                self?.applyShapeMask()
             }
         }
-
-        onVisibilityChanged?(true)
     }
 
-    func hide() {
-        panel.orderOut(nil)
-        onVisibilityChanged?(false)
-    }
+    // MARK: - Click-through and hover
 
-    func toggle() {
-        panel.isVisible ? hide() : show()
-    }
-
-    @objc func reposition() {
-        guard let screen = preferredScreen() else { return }
-
-        let fallbackCenterX = screen.visibleFrame.midX
-        let notchCenter = validatedNotchCenterX(for: screen, fallbackCenterX: fallbackCenterX)
-        let centerX = notchCenter ?? fallbackCenterX
-        let panelWidth = panel.frame.width > 0 ? panel.frame.width : Layout.width
-        let panelHeight = panel.frame.height > 0 ? panel.frame.height : Layout.height
-        let x = clamp(
-            centerX - panelWidth / 2.0,
-            min: screen.frame.minX + Layout.horizontalPadding,
-            max: screen.frame.maxX - panelWidth - Layout.horizontalPadding
-        )
-
-        // On notched displays we anchor to the very top screen edge.
-        // On non-notched displays we stay below the menu bar.
-        let topReference = notchCenter != nil ? screen.frame.maxY : screen.visibleFrame.maxY
-        let y = topReference - panelHeight - Layout.topPadding
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-        applyShapeMask()
-    }
-
-    private func configureLayerClipping(for view: NSView) {
-        view.wantsLayer = true
-        guard let layer = view.layer else { return }
-
-        layer.backgroundColor = NSColor.clear.cgColor
-        layer.masksToBounds = true
-        layer.cornerRadius = Layout.cornerRadius
-        if #available(macOS 10.15, *) {
-            layer.cornerCurve = .continuous
+    private func installMouseMonitors() {
+        // A global monitor only sees events sent to other apps, so a local one covers our own panel.
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.updatePointer() }
+        }) {
+            mouseMonitors.append(global)
         }
-        layer.allowsEdgeAntialiasing = true
-    }
-
-    private func applyShapeMask() {
-        guard let contentView = panel.contentView,
-              let contentLayer = contentView.layer,
-              let hostingLayer = hostingController.view.layer else {
-            return
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.updatePointer() }
+            return event
+        }) {
+            mouseMonitors.append(local)
         }
-
-        let bounds = contentView.bounds
-        guard bounds.width > 0, bounds.height > 0 else { return }
-
-        let insetBounds = bounds.insetBy(dx: 0.5, dy: 0.5)
-        let path = CGPath(
-            roundedRect: insetBounds,
-            cornerWidth: Layout.cornerRadius,
-            cornerHeight: Layout.cornerRadius,
-            transform: nil
-        )
-
-        let contentMask = CAShapeLayer()
-        contentMask.frame = bounds
-        contentMask.path = path
-        contentMask.fillColor = NSColor.black.cgColor
-        contentMask.contentsScale = panel.backingScaleFactor
-        contentLayer.mask = contentMask
-
-        let hostingMask = CAShapeLayer()
-        hostingMask.frame = bounds
-        hostingMask.path = path
-        hostingMask.fillColor = NSColor.black.cgColor
-        hostingMask.contentsScale = panel.backingScaleFactor
-        hostingLayer.mask = hostingMask
     }
+
+    /// Lets clicks through outside the current island shape and reports hover transitions.
+    private func updatePointer() {
+        guard panel.isVisible else { return }
+
+        let size = IslandShapeMetrics.size(for: coordinator.mode, notch: coordinator.notch)
+        var hitRect = IslandShapeMetrics.hitRect(panelFrame: panel.frame, size: size)
+        // The cursor can sit exactly on the screen's top edge, which `contains` treats as outside.
+        hitRect.size.height += 1
+        let inside = hitRect.contains(NSEvent.mouseLocation)
+
+        panel.ignoresMouseEvents = !inside
+        guard inside != pointerInside else { return }
+        pointerInside = inside
+        if inside {
+            coordinator.pointerEntered()
+        } else {
+            coordinator.pointerExited()
+        }
+    }
+
+    // MARK: - Screen selection
 
     private func preferredScreen() -> NSScreen? {
         let screens = NSScreen.screens
 
-        if let notchedBuiltIn = screens.first(where: { $0.isBuiltInDisplay && notchCenterX(for: $0) != nil }) {
+        if let notchedBuiltIn = screens.first(where: { $0.isBuiltInDisplay && notchGeometry(for: $0) != nil }) {
             return notchedBuiltIn
         }
 
@@ -182,55 +203,26 @@ final class IslandPanelController {
         return NSScreen.main ?? screens.first
     }
 
-    private func notchCenterX(for screen: NSScreen) -> CGFloat? {
-        if #available(macOS 12.0, *) {
-            guard let rawLeft = screen.auxiliaryTopLeftArea,
-                  let rawRight = screen.auxiliaryTopRightArea else {
-                return nil
-            }
-
-            let left = normalizedAuxiliaryArea(rawLeft, on: screen)
-            let right = normalizedAuxiliaryArea(rawRight, on: screen)
-
-            guard !left.isEmpty, !right.isEmpty else { return nil }
-            return (left.maxX + right.minX) / 2.0
-        }
-        return nil
-    }
-
-    private func validatedNotchCenterX(for screen: NSScreen, fallbackCenterX: CGFloat) -> CGFloat? {
-        guard let notchCenter = notchCenterX(for: screen) else { return nil }
-
-        // Defensive clamp: ignore obviously incorrect notch centers that can appear on first launch.
-        let maxAllowedDeviation = max(60, screen.frame.width * 0.18)
-        guard abs(notchCenter - fallbackCenterX) <= maxAllowedDeviation else {
-            return nil
-        }
-        return notchCenter
-    }
-
-    private func normalizedAuxiliaryArea(_ rect: CGRect, on screen: NSScreen) -> CGRect {
-        var normalized = rect
-        let frame = screen.frame
-
-        // Some configurations can report auxiliary areas in backing-space coordinates.
-        let looksLikeBackingSpace = normalized.maxX > frame.maxX * 1.25 || normalized.width > frame.width * 1.25
-        if looksLikeBackingSpace {
-            normalized = screen.convertRectFromBacking(normalized)
-        }
-
-        // If coordinates are local to the screen (0...width), translate to global coordinates.
-        let appearsLocalX = normalized.minX >= -1 && normalized.maxX <= frame.width + 1
-        let appearsLocalY = normalized.minY >= -1 && normalized.maxY <= frame.height + 1
-        if appearsLocalX && appearsLocalY {
-            normalized = normalized.offsetBy(dx: frame.minX, dy: frame.minY)
-        }
-
-        return normalized
+    private func notchGeometry(for screen: NSScreen) -> NotchGeometry? {
+        NotchGeometry.make(
+            screenFrame: screen.frame,
+            safeAreaTop: screen.safeAreaInsets.top,
+            backingScale: screen.backingScaleFactor,
+            auxLeft: screen.auxiliaryTopLeftArea,
+            auxRight: screen.auxiliaryTopRightArea,
+            fallbackCenterX: screen.visibleFrame.midX
+        )
     }
 
     private func clamp(_ value: CGFloat, min minValue: CGFloat, max maxValue: CGFloat) -> CGFloat {
         Swift.max(minValue, Swift.min(value, maxValue))
+    }
+}
+
+/// AppKit constrains a visible window to below the menu bar; the island must sit over the notch.
+private final class IslandPanel: NSPanel {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
     }
 }
 

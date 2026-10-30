@@ -17,10 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureNotificationActions()
 
         Task { await container.islandViewModel.bootstrap() }
-
-        if container.settingsStore.showOnStartup {
-            panelController?.show()
-        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -28,12 +24,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureIslandPanel() {
-        let islandView = IslandView(viewModel: container.islandViewModel)
-        let controller = IslandPanelController(rootView: islandView)
-        controller.onVisibilityChanged = { [weak self] visible in
-            self?.container.settingsStore.overlayVisible = visible
+        let coordinator = container.islandCoordinator
+        // `overlayVisible` now tracks expansion; IslandViewModel throttles polling off it.
+        coordinator.onExpandedChanged = { [weak self] expanded in
+            self?.container.settingsStore.overlayVisible = expanded
         }
-        panelController = controller
+        panelController = IslandPanelController(coordinator: coordinator, viewModel: container.islandViewModel)
     }
 
     private func configureStatusItem() {
@@ -88,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleOverlay(_ sender: Any?) {
-        panelController?.toggle()
+        container.islandCoordinator.toggleExpanded()
     }
 
     @objc private func handleToggleOverlayNotification(_ notification: Notification) {

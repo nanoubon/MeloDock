@@ -1,10 +1,8 @@
 import SwiftUI
 
-struct IslandView: View {
+/// The expanded now-playing player. The island shell supplies its frame, background and clip.
+struct ExpandedMusicView: View {
     private enum Layout {
-        static let panelWidth: CGFloat = 612
-        static let panelHeight: CGFloat = 176
-        static let cornerRadius: CGFloat = 26
         static let outerPadding: CGFloat = 16
         static let blockSpacing: CGFloat = 10
         static let compactSpacing: CGFloat = 8
@@ -19,10 +17,6 @@ struct IslandView: View {
         static let textPrimary = Color.white.opacity(0.98)
         static let textSecondary = Color.white.opacity(0.76)
         static let textTertiary = Color.white.opacity(0.54)
-        static let panelTop = Color(red: 0.07, green: 0.08, blue: 0.10)
-        static let panelBottom = Color(red: 0.01, green: 0.01, blue: 0.02)
-        static let panelBorder = Color.white.opacity(0.08)
-        static let panelGlow = Color(red: 0.53, green: 0.74, blue: 1.0).opacity(0.20)
         static let fieldFill = Color.white.opacity(0.09)
         static let fieldStroke = Color.white.opacity(0.13)
         static let progressTrack = Color.white.opacity(0.16)
@@ -40,18 +34,12 @@ struct IslandView: View {
         }
         .padding(.horizontal, Layout.outerPadding)
         .padding(.vertical, Layout.outerPadding)
-        .frame(width: Layout.panelWidth, height: Layout.panelHeight)
         .foregroundStyle(Theme.textPrimary)
-        .colorScheme(.dark)
-        .background(panelBackground)
-        .clipShape(panelShape, style: FillStyle(eoFill: false, antialiased: true))
-        .overlay(panelBorderOverlay)
-        .overlay(panelGlowOverlay)
     }
 
     private var topRow: some View {
         HStack(spacing: Layout.blockSpacing) {
-            artworkView
+            NowPlayingArtworkView(url: viewModel.artworkURL, cornerRadius: 14, placeholderIconSize: 19)
                 .frame(width: Layout.albumSize, height: Layout.albumSize)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -211,27 +199,6 @@ struct IslandView: View {
         .background(fieldCapsule())
     }
 
-    private var panelBackground: some View {
-        panelShape
-            .fill(
-                LinearGradient(
-                    colors: [Theme.panelTop, Theme.panelBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-    }
-
-    private var panelBorderOverlay: some View {
-        panelShape
-            .strokeBorder(Theme.panelBorder, lineWidth: 1, antialiased: true)
-    }
-
-    private var panelGlowOverlay: some View {
-        panelShape
-            .strokeBorder(Theme.panelGlow.opacity(0.7), lineWidth: 1, antialiased: true)
-    }
-
     private func fieldCapsule() -> some View {
         Capsule(style: .continuous)
             .fill(Theme.fieldFill)
@@ -240,10 +207,16 @@ struct IslandView: View {
                     .strokeBorder(Theme.fieldStroke, lineWidth: 1, antialiased: true)
             )
     }
+}
 
-    @ViewBuilder
-    private var artworkView: some View {
-        if let url = viewModel.artworkURL {
+/// Album artwork with a music-note placeholder, shared by the compact and expanded views.
+struct NowPlayingArtworkView: View {
+    let url: URL?
+    let cornerRadius: CGFloat
+    let placeholderIconSize: CGFloat
+
+    var body: some View {
+        if let url {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
@@ -251,30 +224,26 @@ struct IslandView: View {
                         .resizable()
                         .scaledToFill()
                 default:
-                    placeholderArtwork
+                    placeholder
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         } else {
-            placeholderArtwork
+            placeholder
         }
     }
 
-    private var placeholderArtwork: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(Color.white.opacity(0.11))
             .overlay(
                 Image(systemName: "music.note")
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: placeholderIconSize, weight: .medium))
                     .foregroundStyle(.white.opacity(0.88))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.10), lineWidth: 1, antialiased: true)
             )
-    }
-
-    private var panelShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
     }
 }
