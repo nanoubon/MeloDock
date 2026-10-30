@@ -17,8 +17,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		3EC8BD422F49571D00AED5D6 /* MeloDockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeloDockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EC8BD262F49571B00AED5D6 /* MeloDock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeloDock.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EC8BD422F49571D00AED5D6 /* MeloDockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeloDockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */

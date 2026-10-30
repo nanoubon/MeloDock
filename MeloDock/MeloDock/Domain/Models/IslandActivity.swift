@@ -1,5 +1,3 @@
-import Combine
-
 /// One thing the island can show (now playing, timer, ...).
 struct IslandActivity: Identifiable, Equatable {
     enum Kind: Hashable { case nowPlaying, power, audio, capture, timer, calendar }
@@ -12,9 +10,25 @@ struct IslandActivity: Identifiable, Equatable {
         static let nowPlayingPaused = 20
     }
 
+    /// Kind-specific data. Timer and calendar carry no payload until Phase 3 defines it.
+    enum Detail: Equatable {
+        case nowPlaying
+        case capture(mic: Bool, camera: Bool)
+        case timer
+        case calendar
+    }
+
     let id: String
     let kind: Kind
     let priority: Int
+    let detail: Detail
+
+    init(id: String, kind: Kind, priority: Int, detail: Detail = .nowPlaying) {
+        self.id = id
+        self.kind = kind
+        self.priority = priority
+        self.detail = detail
+    }
 }
 
 /// The top two activities by priority.
@@ -29,9 +43,4 @@ struct IslandSelection: Equatable {
         }
         return IslandSelection(primary: sorted.first, secondary: sorted.dropFirst().first)
     }
-}
-
-@MainActor
-protocol ActivitySource: AnyObject {
-    var activitiesPublisher: AnyPublisher<[IslandActivity], Never> { get }
 }
