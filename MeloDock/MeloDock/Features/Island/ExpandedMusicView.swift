@@ -13,6 +13,8 @@ struct ExpandedMusicView: View {
         static let artworkToText: CGFloat = 16
         static let chipGap: CGFloat = 8
         static let titleLineHeight: CGFloat = 24
+        static let titleToSpectrum: CGFloat = 8
+        static let spectrumHeight: CGFloat = 15
         static let artistLineHeight: CGFloat = 18
         static let railHitHeight: CGFloat = 14
         static let timesHeight: CGFloat = 14
@@ -67,13 +69,7 @@ struct ExpandedMusicView: View {
                 )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.trackTitle)
-                    .font(.system(size: 19, weight: .semibold))
-                    .tracking(-0.2)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(minHeight: Layout.titleLineHeight)
-                    .layoutPriority(1)
+                titleLine
 
                 Text(viewModel.trackArtist)
                     .font(.system(size: 14, weight: .regular))
@@ -98,10 +94,27 @@ struct ExpandedMusicView: View {
 
                     SourceChip(selection: viewModel.selectedProvider) { viewModel.setProvider($0) }
                 }
+            }
+            .frame(height: Layout.artworkSize, alignment: .top)
+        }
+        .frame(height: Layout.artworkSize)
+    }
 
-                Spacer(minLength: 0)
+    /// Title with the spectrum inline after it. The title keeps priority and truncates first;
+    /// the spectrum drops out only when the full title plus spectrum does not fit.
+    private var titleLine: some View {
+        let title = Text(viewModel.trackTitle)
+            .font(.system(size: 19, weight: .semibold))
+            .tracking(-0.2)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(minHeight: Layout.titleLineHeight)
+            .layoutPriority(1)
 
-                if viewModel.shouldShowSpectrum {
+        return ViewThatFits(in: .horizontal) {
+            if viewModel.shouldShowSpectrum {
+                HStack(alignment: .center, spacing: Layout.titleToSpectrum) {
+                    title
                     MusicSpectrumView(
                         isActive: viewModel.playbackState.isPlaying,
                         seed: viewModel.spectrumSeed,
@@ -109,15 +122,15 @@ struct ExpandedMusicView: View {
                         tempoBPM: viewModel.spectrumTempoBPM,
                         barCount: 5,
                         barWidth: 3,
-                        barHeight: 16,
+                        barHeight: Layout.spectrumHeight,
                         barSpacing: 2
                     )
                     .fixedSize()
                 }
             }
-            .frame(height: Layout.artworkSize)
+            title
         }
-        .frame(height: Layout.artworkSize)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var progressSection: some View {
