@@ -318,8 +318,9 @@ final class AppleMusicProvider: MusicProvider {
         }
     }
 
-    private func queryMusicAppSnapshot() async throws -> MusicAppSnapshot? {
-        let script = """
+    /// The sandbox rejects scripts that bind `current track` to a variable (-10004 "privilege violation"),
+    /// so every statement must reference `current track` directly.
+    nonisolated static let snapshotScript = """
         tell application id "com.apple.Music"
             set stateCode to 0
             try
@@ -337,49 +338,48 @@ final class AppleMusicProvider: MusicProvider {
             set trackBPM to 0
             set streamTitle to ""
             try
-                set t to current track
                 try
-                    set trackName to (get «property pnam» of t as string)
+                    set trackName to (get «property pnam» of current track as string)
                 end try
                 if trackName is "" then
                     try
-                        set trackName to (name of t as string)
+                        set trackName to (name of current track as string)
                     end try
                 end if
 
                 try
-                    set trackArtist to (get «property pArt» of t as string)
+                    set trackArtist to (get «property pArt» of current track as string)
                 end try
                 if trackArtist is "" then
                     try
-                        set trackArtist to (artist of t as string)
+                        set trackArtist to (artist of current track as string)
                     end try
                 end if
 
                 try
-                    set trackDuration to (get «property pDur» of t as real)
+                    set trackDuration to (get «property pDur» of current track as real)
                 end try
                 if trackDuration is 0 then
                     try
-                        set trackDuration to (duration of t as real)
+                        set trackDuration to (duration of current track as real)
                     end try
                 end if
 
                 try
-                    set trackBPM to (get «property pBPM» of t as real)
+                    set trackBPM to (get «property pBPM» of current track as real)
                 end try
                 if trackBPM is 0 then
                     try
-                        set trackBPM to (bpm of t as real)
+                        set trackBPM to (bpm of current track as real)
                     end try
                 end if
 
                 try
-                    set trackID to (database ID of t as string)
+                    set trackID to (database ID of current track as string)
                 end try
                 if trackID is "" then
                     try
-                        set trackID to (persistent ID of t as string)
+                        set trackID to (persistent ID of current track as string)
                     end try
                 end if
             end try
@@ -405,6 +405,11 @@ final class AppleMusicProvider: MusicProvider {
 
             return {stateCode, trackID, trackName, trackArtist, trackDuration, trackPosition, trackBPM}
         end tell
+    """
+
+    private func queryMusicAppSnapshot() async throws -> MusicAppSnapshot? {
+        let script = """
+        \(Self.snapshotScript)
         """
 
         guard let payload = try await runMusicSnapshotScript(script) else {
