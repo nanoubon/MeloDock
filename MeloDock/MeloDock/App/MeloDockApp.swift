@@ -19,8 +19,7 @@ struct MeloDockApp: App {
                 .keyboardShortcut("m", modifiers: [.command, .option])
 
                 Button("Open Settings") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    NSApp.activate(ignoringOtherApps: true)
+                    SettingsOpener.open()
                 }
                 .keyboardShortcut(",", modifiers: [.command])
             }
