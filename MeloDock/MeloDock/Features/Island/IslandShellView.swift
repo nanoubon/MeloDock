@@ -25,7 +25,7 @@ struct IslandShellView: View {
         .contentShape(shape)
         // Compact and idle taps expand; expanded content keeps its own controls.
         .gesture(
-            TapGesture().onEnded { coordinator.toggleExpanded() },
+            TapGesture().onEnded { coordinator.expand() },
             including: mode == .expanded ? .subviews : .all
         )
         .animation(.spring(response: 0.4, dampingFraction: 0.78), value: mode)

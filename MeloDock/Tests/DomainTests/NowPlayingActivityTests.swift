@@ -79,5 +79,26 @@ final class NowPlayingActivityTests: XCTestCase {
         source.recheck()
         XCTAssertEqual(emissions.last?.first?.priority, IslandActivity.Priority.nowPlayingPaused)
     }
+
+    // Providers re-send `.paused` on every poll; that must not restart the 5-minute clock.
+    func testRepeatedPausedDoesNotResetClock() {
+        send(.paused)
+        clock = clock.addingTimeInterval(200)
+        send(.paused)
+        clock = clock.addingTimeInterval(150)
+        source.recheck()
+        XCTAssertEqual(emissions.last, [])
+    }
+
+    func testPlayingEmitsNowPlayingAtPriority60() {
+        send(.playing)
+        XCTAssertEqual(emissions.last, [IslandActivity(id: "nowPlaying", kind: .nowPlaying, priority: 60)])
+    }
+
+    func testStoppedEmitsNothing() {
+        send(.playing)
+        send(.stopped)
+        XCTAssertEqual(emissions.last, [])
+    }
 }
 #endif

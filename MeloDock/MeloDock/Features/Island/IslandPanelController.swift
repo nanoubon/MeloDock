@@ -17,8 +17,8 @@ final class IslandPanelController {
     private let panel: NSPanel
     private var cancellables = Set<AnyCancellable>()
     private var mouseMonitors: [Any] = []
+    /// Last hover state reported to the coordinator; changes only on real mouse movement (or an exit).
     private var pointerInside = false
-    private var didApplyInitialShowReposition = false
 
     init(coordinator: IslandCoordinator, viewModel: IslandViewModel) {
         self.coordinator = coordinator
@@ -69,6 +69,15 @@ final class IslandPanelController {
         installMouseMonitors()
         observeCoordinator()
         reposition()
+
+        // Launch can report stale or missing notch geometry; re-check on the next runloop ticks,
+        // even while the panel is hidden, so an idle notch island still appears.
+        DispatchQueue.main.async { [weak self] in
+            self?.reposition()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            self?.reposition()
+        }
     }
 
     deinit {
@@ -97,18 +106,18 @@ final class IslandPanelController {
         // On non-notched displays we stay below the menu bar.
         let topReference = notch != nil ? screen.frame.maxY : screen.visibleFrame.maxY
         panel.setFrameOrigin(NSPoint(x: x, y: topReference - Layout.height))
-        updatePointer()
+        refreshAfterLayoutChange()
     }
 
     private func observeCoordinator() {
-        // @Published emits before the property changes; hop to the next run loop pass so `mode` is current.
+        // @Published emits before the property changes; hop to the main queue so `mode` is current.
         Publishers.Merge4(
             coordinator.$selection.map { _ in () },
             coordinator.$isExpanded.map { _ in () },
             coordinator.$isIslandEnabled.map { _ in () },
             coordinator.$notch.map { _ in () }
         )
-        .receive(on: RunLoop.main)
+        .receive(on: DispatchQueue.main)
         .sink { [weak self] in
             self?.updateVisibility()
         }
@@ -121,7 +130,7 @@ final class IslandPanelController {
 
         if hidden {
             panel.orderOut(nil)
-            panel.ignoresMouseEvents = true
+            setIgnoresMouseEvents(true)
             if pointerInside {
                 pointerInside = false
                 coordinator.pointerExited()
@@ -130,26 +139,10 @@ final class IslandPanelController {
         }
 
         if !panel.isVisible {
-            show()
+            panel.orderFrontRegardless()
+            reposition()
         }
-        updatePointer()
-    }
-
-    private func show() {
-        panel.orderFrontRegardless()
-        reposition()
-
-        // First launch can report stale geometry; re-apply centering on next runloop ticks.
-        if didApplyInitialShowReposition == false {
-            didApplyInitialShowReposition = true
-
-            DispatchQueue.main.async { [weak self] in
-                self?.reposition()
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-                self?.reposition()
-            }
-        }
+        refreshAfterLayoutChange()
     }
 
     // MARK: - Click-through and hover
@@ -157,35 +150,58 @@ final class IslandPanelController {
     private func installMouseMonitors() {
         // A global monitor only sees events sent to other apps, so a local one covers our own panel.
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.updatePointer() }
+            MainActor.assumeIsolated { self?.handleMouseMoved() }
         }) {
             mouseMonitors.append(global)
         }
         if let local = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.updatePointer() }
+            MainActor.assumeIsolated { self?.handleMouseMoved() }
             return event
         }) {
             mouseMonitors.append(local)
         }
     }
 
-    /// Lets clicks through outside the current island shape and reports hover transitions.
-    private func updatePointer() {
+    /// Real mouse movement: refreshes click-through and reports hover transitions.
+    private func handleMouseMoved() {
         guard panel.isVisible else { return }
 
-        let size = IslandShapeMetrics.size(for: coordinator.mode, notch: coordinator.notch)
-        var hitRect = IslandShapeMetrics.hitRect(panelFrame: panel.frame, size: size)
-        // The cursor can sit exactly on the screen's top edge, which `contains` treats as outside.
-        hitRect.size.height += 1
-        let inside = hitRect.contains(NSEvent.mouseLocation)
-
-        panel.ignoresMouseEvents = !inside
+        let inside = refreshClickThrough()
         guard inside != pointerInside else { return }
         pointerInside = inside
         if inside {
             coordinator.pointerEntered()
         } else {
             coordinator.pointerExited()
+        }
+    }
+
+    /// The shape or panel moved under a still cursor. Only an exit is reported, so ears
+    /// appearing under a resting cursor do not count as a hover.
+    private func refreshAfterLayoutChange() {
+        guard panel.isVisible else { return }
+
+        let inside = refreshClickThrough()
+        if !inside && pointerInside {
+            pointerInside = false
+            coordinator.pointerExited()
+        }
+    }
+
+    /// Lets clicks through outside the current island shape; returns whether the cursor is inside it.
+    private func refreshClickThrough() -> Bool {
+        let size = IslandShapeMetrics.size(for: coordinator.mode, notch: coordinator.notch)
+        var hitRect = IslandShapeMetrics.hitRect(panelFrame: panel.frame, size: size)
+        // The cursor can sit exactly on the screen's top edge, which `contains` treats as outside.
+        hitRect.size.height += 1
+        let inside = hitRect.contains(NSEvent.mouseLocation)
+        setIgnoresMouseEvents(!inside)
+        return inside
+    }
+
+    private func setIgnoresMouseEvents(_ ignores: Bool) {
+        if panel.ignoresMouseEvents != ignores {
+            panel.ignoresMouseEvents = ignores
         }
     }
 
@@ -202,7 +218,8 @@ final class IslandPanelController {
             return builtIn
         }
 
-        return NSScreen.main ?? screens.first
+        // Lid closed: the primary (menu-bar) display, not the key window's screen.
+        return screens.first ?? NSScreen.main
     }
 
     private func notchGeometry(for screen: NSScreen) -> NotchGeometry? {

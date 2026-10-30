@@ -155,5 +155,32 @@ final class IslandCoordinatorTests: XCTestCase {
         c.toggleExpanded()
         XCTAssertEqual(events, [true, false])
     }
+
+    // A click that lands just after the hover deadline must not collapse the island the hover just opened.
+    func testExpandAfterHoverExpansionStaysExpanded() async {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        var events: [Bool] = []
+        c.onExpandedChanged = { events.append($0) }
+        c.pointerEntered()
+        await wait()
+        XCTAssertEqual(c.mode, .expanded)
+        c.expand()
+        XCTAssertEqual(c.mode, .expanded)
+        XCTAssertEqual(events, [true])
+    }
+
+    func testExpandFromCompactExpandsAndCancelsPendingHover() async {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        var events: [Bool] = []
+        c.onExpandedChanged = { events.append($0) }
+        c.pointerEntered()
+        c.expand()
+        XCTAssertEqual(c.mode, .expanded)
+        await wait()
+        XCTAssertEqual(c.mode, .expanded)
+        XCTAssertEqual(events, [true])
+    }
 }
 #endif

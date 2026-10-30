@@ -46,6 +46,12 @@ final class IslandCoordinator: ObservableObject {
         setExpanded(!isExpanded)
     }
 
+    /// Expands without toggling, so a click racing the hover delay cannot collapse the island.
+    func expand() {
+        cancelHover()
+        setExpanded(true)
+    }
+
     func pointerEntered() {
         pointerInside = true
         guard mode == .compact else { return }
