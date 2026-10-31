@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-final class KeychainService {
+class KeychainService {
     private let service = "com.nano.melodock"
 
     func set(_ value: String, for key: String) throws {

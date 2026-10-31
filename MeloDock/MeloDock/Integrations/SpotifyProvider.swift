@@ -37,10 +37,8 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
         self.keychainService = keychainService
         self.session = session
         super.init()
-
-        if loadToken() != nil {
-            authSubject.send(.authorized)
-        }
+        // The token is read lazily on the first refresh so launching the app
+        // never touches the Keychain unless Spotify is actually in use.
     }
 
     func authorize() async {
