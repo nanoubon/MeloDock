@@ -190,9 +190,16 @@ final class IslandViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        audioDeviceProvider.eventsPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+        let audioEvents = audioDeviceProvider.eventsPublisher.receive(on: DispatchQueue.main)
+        // A volume event carries its value: apply it directly instead of enumerating every device.
+        audioEvents
+            .compactMap(AudioEventCoalescer.volume(in:))
+            .sink { [weak self] volume in self?.volume = volume }
+            .store(in: &cancellables)
+        // Device-list and default-output changes arrive in bursts; one enumeration per window is enough.
+        AudioEventCoalescer.refreshTriggers(audioEvents.eraseToAnyPublisher(),
+                                            scheduler: DispatchQueue.main, window: AudioEventCoalescer.window)
+            .sink { [weak self] in
                 guard let provider = self?.audioDeviceProvider else { return }
                 Task { await provider.refresh() }
             }

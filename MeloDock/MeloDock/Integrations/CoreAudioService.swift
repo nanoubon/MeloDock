@@ -42,7 +42,9 @@ final class CoreAudioService: AudioDeviceProvider, @unchecked Sendable {
         guard let deviceID = defaultOutputDeviceID() else { return }
         let notify: () -> Void = { [weak self] in
             guard let self else { return }
-            self.eventsSubject.send(.volumeChanged(self.fetchCurrentVolume()))
+            let volume = self.fetchCurrentVolume()
+            self.volumeSubject.send(volume)
+            self.eventsSubject.send(.volumeChanged(volume))
         }
         var virtualAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,

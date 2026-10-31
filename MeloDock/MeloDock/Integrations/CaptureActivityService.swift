@@ -14,9 +14,7 @@ final class CaptureActivityService {
     private let subject: CurrentValueSubject<CaptureUsage, Never>
     private let audioListeners = CoreAudioListenerBag()
     private static let deviceTag = "inputDevice"
-    private var cameraRegistrations: [(CMIOObjectID, CMIOObjectPropertyAddress)] = []
-    private var cameraBlock: CMIOObjectPropertyListenerBlock?
-    private var cameraListListenerRegistered = false
+    private let cameraListeners = CameraListenerBag()
 
     var usagePublisher: AnyPublisher<CaptureUsage, Never> {
         subject.eraseToAnyPublisher()
@@ -30,10 +28,7 @@ final class CaptureActivityService {
         refresh()
     }
 
-    deinit {
-        audioListeners.removeAll()
-        removeCameraListeners()
-    }
+    // No deinit: both listener bags remove their own listeners when released, on whatever thread that is.
 
     private func refresh() {
         let usage = CaptureUsage(mic: Self.isAnyInputRunning(),
@@ -129,38 +124,75 @@ final class CaptureActivityService {
     }
 
     private func registerCameraListeners() {
-        let block: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
+        cameraListeners.registerList { [weak self] in
             MainActor.assumeIsolated {
-                self?.registerCameraListeners()
+                // Only a device-list change re-registers the per-device listeners.
+                self?.registerCameraDeviceListeners()
                 self?.refresh()
             }
         }
-        removeCameraListeners()
-        cameraBlock = block
-        var listAddress = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
-                                                    mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
-                                                    mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
-        let system = CMIOObjectID(kCMIOObjectSystemObject)
-        if CMIOObjectAddPropertyListenerBlock(system, &listAddress, .main, block) == noErr {
-            cameraRegistrations.append((system, listAddress))
+        registerCameraDeviceListeners()
+    }
+
+    private func registerCameraDeviceListeners() {
+        cameraListeners.registerDevices(Self.cameraDeviceIDs()) { [weak self] in
+            MainActor.assumeIsolated { self?.refresh() }
         }
-        for device in Self.cameraDeviceIDs() {
-            var address = Self.runningSomewhereAddress()
+    }
+}
+
+/// Owns the CoreMediaIO listener blocks and removes them in its own (non-isolated) deinit, so releasing the
+/// service from any thread is safe. Mutate from the main thread only.
+final class CameraListenerBag {
+    private var list: (CMIOObjectPropertyAddress, CMIOObjectPropertyListenerBlock)?
+    private var devices: [(CMIOObjectID, CMIOObjectPropertyAddress)] = []
+    private var deviceBlock: CMIOObjectPropertyListenerBlock?
+
+    deinit { removeAll() }
+
+    func registerList(_ handler: @escaping () -> Void) {
+        guard list == nil else { return }
+        let block: CMIOObjectPropertyListenerBlock = { _, _ in handler() }
+        var address = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
+                                                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+                                                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        if CMIOObjectAddPropertyListenerBlock(CMIOObjectID(kCMIOObjectSystemObject), &address, .main, block) == noErr {
+            list = (address, block)
+        }
+    }
+
+    /// Replaces the per-device running-state listeners.
+    func registerDevices(_ ids: [CMIOObjectID], handler: @escaping () -> Void) {
+        removeDevices()
+        let block: CMIOObjectPropertyListenerBlock = { _, _ in handler() }
+        deviceBlock = block
+        for device in ids {
+            var address = CMIOObjectPropertyAddress(
+                mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere),
+                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
             if CMIOObjectAddPropertyListenerBlock(device, &address, .main, block) == noErr {
-                cameraRegistrations.append((device, address))
+                devices.append((device, address))
             }
         }
     }
 
-    private nonisolated func removeCameraListeners() {
-        // Called from deinit; registrations are only mutated on the main actor before deinit.
-        MainActor.assumeIsolated {
-            guard let block = cameraBlock else { return }
-            for (object, address) in cameraRegistrations {
+    private func removeDevices() {
+        if let block = deviceBlock {
+            for (object, address) in devices {
                 var address = address
                 CMIOObjectRemovePropertyListenerBlock(object, &address, .main, block)
             }
-            cameraRegistrations.removeAll()
         }
+        devices.removeAll()
+        deviceBlock = nil
+    }
+
+    func removeAll() {
+        removeDevices()
+        if var (address, block) = list {
+            CMIOObjectRemovePropertyListenerBlock(CMIOObjectID(kCMIOObjectSystemObject), &address, .main, block)
+        }
+        list = nil
     }
 }
