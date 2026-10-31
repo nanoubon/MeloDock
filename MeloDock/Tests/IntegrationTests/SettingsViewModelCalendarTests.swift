@@ -1,4 +1,5 @@
 #if canImport(XCTest)
+import AppKit
 import Combine
 import XCTest
 @testable import MeloDock
@@ -8,6 +9,9 @@ private final class FakeCalendarAccess: CalendarAccessProviding {
     let status: CurrentValueSubject<CalendarAuthorizationStatus, Never>
     var grant: Bool
     var requestCount = 0
+    var refreshCount = 0
+    /// What the system reports the next time the status is re-read.
+    var systemStatus: CalendarAuthorizationStatus?
 
     init(status: CalendarAuthorizationStatus, grant: Bool = true) {
         self.status = CurrentValueSubject(status)
@@ -16,6 +20,11 @@ private final class FakeCalendarAccess: CalendarAccessProviding {
 
     var authorizationStatus: CalendarAuthorizationStatus { status.value }
     var authorizationStatusPublisher: AnyPublisher<CalendarAuthorizationStatus, Never> { status.eraseToAnyPublisher() }
+
+    func refreshAuthorizationStatus() {
+        refreshCount += 1
+        if let systemStatus, systemStatus != status.value { status.send(systemStatus) }
+    }
 
     func requestAccess() async -> Bool {
         requestCount += 1
@@ -42,6 +51,8 @@ final class SettingsViewModelCalendarTests: XCTestCase {
         super.tearDown()
     }
 
+    private var center = NotificationCenter()
+
     private func makeViewModel(access: FakeCalendarAccess) -> (SettingsViewModel, SettingsStore) {
         let store = SettingsStore(defaults: defaults)
         let spotify = SpotifyProvider(settingsStore: store, keychainService: KeychainService())
@@ -52,7 +63,8 @@ final class SettingsViewModelCalendarTests: XCTestCase {
             spotifyProvider: spotify,
             proFeatureService: StoreKitProServiceStub(),
             calendarAccess: access,
-            openURL: { [unowned self] in self.opened.append($0) })
+            openURL: { [unowned self] in self.opened.append($0) },
+            notificationCenter: center)
         return (viewModel, store)
     }
 
@@ -124,6 +136,29 @@ final class SettingsViewModelCalendarTests: XCTestCase {
         XCTAssertFalse(viewModel.showCalendar)
         XCTAssertFalse(store.showCalendar)
         XCTAssertTrue(viewModel.calendarAccessDenied)
+    }
+
+    func testAppBecomingActiveRereadsStatusAndSeesRevocation() async {
+        let access = FakeCalendarAccess(status: .authorized)
+        let (viewModel, store) = makeViewModel(access: access)
+        await viewModel.setCalendarEnabled(true)
+        access.systemStatus = .denied // revoked in System Settings, nothing published yet
+        XCTAssertTrue(viewModel.showCalendar)
+        center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        XCTAssertEqual(access.refreshCount, 1)
+        XCTAssertFalse(viewModel.showCalendar)
+        XCTAssertFalse(store.showCalendar)
+        XCTAssertTrue(viewModel.calendarAccessDenied)
+    }
+
+    func testRefreshCalendarAccessWhenSettingsAppearsRereadsStatus() async {
+        let access = FakeCalendarAccess(status: .authorized)
+        let (viewModel, _) = makeViewModel(access: access)
+        await viewModel.setCalendarEnabled(true)
+        access.systemStatus = .denied
+        viewModel.refreshCalendarAccess()
+        XCTAssertEqual(access.refreshCount, 1)
+        XCTAssertFalse(viewModel.showCalendar)
     }
 
     func testOpenCalendarPrivacySettingsUsesPrivacyCalendarsURL() {

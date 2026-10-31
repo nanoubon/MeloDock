@@ -31,6 +31,7 @@ final class SettingsViewModel: ObservableObject {
     private let calendarAccess: CalendarAccessProviding
     private let openURL: (URL) -> Void
 
+    private let notificationCenter: NotificationCenter
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -40,7 +41,8 @@ final class SettingsViewModel: ObservableObject {
         spotifyProvider: SpotifyProvider,
         proFeatureService: ProFeatureService,
         calendarAccess: CalendarAccessProviding,
-        openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }
+        openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
+        notificationCenter: NotificationCenter = .default
     ) {
         self.settingsStore = settingsStore
         self.launchAtLoginService = launchAtLoginService
@@ -49,6 +51,7 @@ final class SettingsViewModel: ObservableObject {
         self.proFeatureService = proFeatureService
         self.calendarAccess = calendarAccess
         self.openURL = openURL
+        self.notificationCenter = notificationCenter
 
         preferredProvider = settingsStore.preferredProvider
         showOnStartup = settingsStore.showOnStartup
@@ -114,6 +117,12 @@ final class SettingsViewModel: ObservableObject {
         }
         applyCalendar(granted)
         calendarAccessDenied = !granted
+    }
+
+    /// Permission can be revoked or granted in System Settings while the app runs; call when
+    /// Settings appears and when the app becomes active again.
+    func refreshCalendarAccess() {
+        calendarAccess.refreshAuthorizationStatus()
     }
 
     func openCalendarPrivacySettings() {
@@ -233,6 +242,12 @@ final class SettingsViewModel: ObservableObject {
                 guard let self, status == .denied, self.showCalendar else { return }
                 self.applyCalendar(false)
                 self.calendarAccessDenied = true
+            }
+            .store(in: &cancellables)
+
+        notificationCenter.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshCalendarAccess() }
             }
             .store(in: &cancellables)
 

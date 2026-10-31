@@ -1,4 +1,5 @@
 #if canImport(XCTest)
+import AppKit
 import Combine
 import XCTest
 @testable import MeloDock
@@ -16,6 +17,8 @@ private final class FakeCalendarProvider: CalendarEventProviding {
     var authorizationStatusPublisher: AnyPublisher<CalendarAuthorizationStatus, Never> { status.eraseToAnyPublisher() }
     var changesPublisher: AnyPublisher<Void, Never> { changes.eraseToAnyPublisher() }
 
+    func refreshAuthorizationStatus() {}
+
     func requestAccess() async -> Bool {
         requestCount += 1
         status.send(accessResult ? .authorized : .denied)
@@ -24,6 +27,27 @@ private final class FakeCalendarProvider: CalendarEventProviding {
 
     func events(from: Date, to: Date) -> [CalendarEventInfo] {
         fetchCount += 1
+        return events.filter { $0.start < to && $0.end > from }
+    }
+}
+
+/// Mirrors the old service: `@Published` emits in willSet, and `events` guards on the stored value.
+@MainActor
+private final class WillSetOrderingProvider: CalendarEventProviding, ObservableObject {
+    @Published private(set) var authorizationStatus: CalendarAuthorizationStatus = .notDetermined
+    let changes = PassthroughSubject<Void, Never>()
+    var events: [CalendarEventInfo] = []
+
+    var authorizationStatusPublisher: AnyPublisher<CalendarAuthorizationStatus, Never> {
+        $authorizationStatus.eraseToAnyPublisher()
+    }
+    var changesPublisher: AnyPublisher<Void, Never> { changes.eraseToAnyPublisher() }
+
+    func setStatus(_ status: CalendarAuthorizationStatus) { authorizationStatus = status }
+    func refreshAuthorizationStatus() {}
+    func requestAccess() async -> Bool { true }
+    func events(from: Date, to: Date) -> [CalendarEventInfo] {
+        guard authorizationStatus == .authorized else { return [] }
         return events.filter { $0.start < to && $0.end > from }
     }
 }
@@ -55,6 +79,13 @@ final class CalendarActivitySourceTests: XCTestCase {
         return source
     }
 
+    /// The source hops one main-queue turn on status changes; wait for it.
+    private func settle() {
+        let done = expectation(description: "main queue turn")
+        DispatchQueue.main.async { done.fulfill() }
+        wait(for: [done], timeout: 2)
+    }
+
     private var liveTimers: [(delay: TimeInterval, fire: @MainActor () -> Void, cancelled: Bool)] {
         scheduled.filter { !$0.cancelled }
     }
@@ -75,6 +106,7 @@ final class CalendarActivitySourceTests: XCTestCase {
         let provider = FakeCalendarProvider()
         let source = makeSource(provider)
         provider.status.send(.denied)
+        settle()
         XCTAssertEqual(provider.fetchCount, 0)
         XCTAssertNil(source.activeEvent)
     }
@@ -84,6 +116,7 @@ final class CalendarActivitySourceTests: XCTestCase {
         provider.events = [event("a", in: 300)]
         let source = makeSource(provider)
         provider.status.send(.authorized)
+        settle()
         XCTAssertEqual(latest, [IslandActivity(id: "calendar", kind: .calendar,
                                                priority: IslandActivity.Priority.calendar, detail: .calendar)])
         XCTAssertEqual(source.activeEvent?.id, "a")
@@ -94,6 +127,7 @@ final class CalendarActivitySourceTests: XCTestCase {
         provider.events = [event("a", in: 3600)]
         let source = makeSource(provider)
         provider.status.send(.authorized)
+        settle()
         XCTAssertTrue(latest.isEmpty)
         XCTAssertEqual(liveTimers.count, 1)
         XCTAssertEqual(liveTimers[0].delay, 3000, accuracy: 0.001) // start - 10 min
@@ -111,10 +145,60 @@ final class CalendarActivitySourceTests: XCTestCase {
         XCTAssertNil(source.activeEvent)
     }
 
+    func testAuthorizationEmittedBeforeStoredStatusUpdatesStillLoadsEvents() {
+        let provider = WillSetOrderingProvider()
+        provider.events = [event("a", in: 60)]
+        scheduled = []
+        let source = CalendarActivitySource(
+            provider: provider, now: { [unowned self] in self.now },
+            scheduler: { [unowned self] delay, fire in
+                self.scheduled.append((delay, fire, false))
+                return AnyCancellable {}
+            })
+        provider.setStatus(.authorized)
+        settle()
+        XCTAssertEqual(source.activeEvent?.id, "a")
+    }
+
+    func testWakeClockTimeZoneAndDayChangeAllRefresh() {
+        let provider = FakeCalendarProvider()
+        let center = NotificationCenter()
+        let workspace = NotificationCenter()
+        scheduled = []
+        let source = CalendarActivitySource(
+            provider: provider, now: { [unowned self] in self.now },
+            scheduler: { [unowned self] delay, fire in
+                self.scheduled.append((delay, fire, false))
+                let index = self.scheduled.count - 1
+                return AnyCancellable { self.scheduled[index].cancelled = true }
+            },
+            notificationCenter: center, workspaceNotificationCenter: workspace)
+        provider.status.send(.authorized)
+        settle()
+        var fetches = provider.fetchCount
+        let posts: [(NotificationCenter, Notification.Name)] = [
+            (workspace, NSWorkspace.didWakeNotification), (center, .NSSystemClockDidChange),
+            (center, .NSSystemTimeZoneDidChange), (center, .NSCalendarDayChanged)]
+        for (nc, name) in posts {
+            provider.events = [event("n-\(name.rawValue)", in: 60)]
+            nc.post(name: name, object: nil)
+            settle()
+            XCTAssertEqual(provider.fetchCount, fetches + 1, "\(name.rawValue) should refresh")
+            XCTAssertEqual(source.activeEvent?.id, "n-\(name.rawValue)")
+            fetches = provider.fetchCount
+        }
+        provider.status.send(.denied)
+        settle()
+        center.post(name: .NSSystemClockDidChange, object: nil)
+        settle()
+        XCTAssertEqual(provider.fetchCount, fetches, "no refresh once access is lost")
+    }
+
     func testStoreChangeRefreshes() {
         let provider = FakeCalendarProvider()
         let source = makeSource(provider)
         provider.status.send(.authorized)
+        settle()
         XCTAssertTrue(latest.isEmpty)
         provider.events = [event("new", in: 60)]
         provider.changes.send()
@@ -127,8 +211,10 @@ final class CalendarActivitySourceTests: XCTestCase {
         provider.events = [event("a", in: 60)]
         let source = makeSource(provider)
         provider.status.send(.authorized)
+        settle()
         XCTAssertNotNil(source.activeEvent)
         provider.status.send(.denied)
+        settle()
         XCTAssertTrue(latest.isEmpty)
         XCTAssertNil(source.activeEvent)
         XCTAssertTrue(liveTimers.isEmpty)
@@ -141,6 +227,7 @@ final class CalendarActivitySourceTests: XCTestCase {
         let provider = FakeCalendarProvider()
         let source = makeSource(provider)
         provider.status.send(.authorized)
+        settle()
         XCTAssertEqual(liveTimers.count, 1)
         XCTAssertLessThanOrEqual(liveTimers[0].delay, 3600)
         withExtendedLifetime(source) {}

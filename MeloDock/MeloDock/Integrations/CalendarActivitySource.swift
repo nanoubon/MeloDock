@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -16,6 +17,9 @@ final class CalendarActivitySource: ActivitySource, ObservableObject {
     private let scheduler: TransientScheduler
     private var statusCancellable: AnyCancellable?
     private var changesCancellable: AnyCancellable?
+    private var triggerCancellables = Set<AnyCancellable>()
+    private let notificationCenter: NotificationCenter
+    private let workspaceNotificationCenter: NotificationCenter
     private var wake: AnyCancellable?
 
     var activitiesPublisher: AnyPublisher<[IslandActivity], Never> {
@@ -24,12 +28,19 @@ final class CalendarActivitySource: ActivitySource, ObservableObject {
 
     init(provider: CalendarEventProviding,
          now: @escaping () -> Date = Date.init,
-         scheduler: @escaping TransientScheduler = IslandCoordinator.defaultScheduler) {
+         scheduler: @escaping TransientScheduler = IslandCoordinator.defaultScheduler,
+         notificationCenter: NotificationCenter = .default,
+         workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter) {
         self.provider = provider
+        self.notificationCenter = notificationCenter
+        self.workspaceNotificationCenter = workspaceNotificationCenter
         self.now = now
         self.scheduler = scheduler
         statusCancellable = provider.authorizationStatusPublisher
             .removeDuplicates()
+            // The provider may emit before its own state has changed (e.g. @Published's willSet),
+            // so hop a runloop turn before reading events.
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
                 MainActor.assumeIsolated { self?.statusChanged(status) }
             }
@@ -40,9 +51,24 @@ final class CalendarActivitySource: ActivitySource, ObservableObject {
             changesCancellable = provider.changesPublisher.sink { [weak self] in
                 MainActor.assumeIsolated { self?.refresh() }
             }
+            // Timers do not fire while asleep and the clock can jump, so re-read on these too.
+            triggerCancellables = []
+            let triggers: [(NotificationCenter, Notification.Name)] = [
+                (workspaceNotificationCenter, NSWorkspace.didWakeNotification),
+                (notificationCenter, .NSSystemClockDidChange),
+                (notificationCenter, .NSSystemTimeZoneDidChange),
+                (notificationCenter, .NSCalendarDayChanged)
+            ]
+            for (center, name) in triggers {
+                center.publisher(for: name)
+                    .receive(on: DispatchQueue.main)
+                    .sink { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
+                    .store(in: &triggerCancellables)
+            }
             refresh()
         } else {
             changesCancellable = nil
+            triggerCancellables = []
             wake = nil
             publish(nil)
         }

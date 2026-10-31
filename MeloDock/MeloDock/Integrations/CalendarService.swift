@@ -14,6 +14,8 @@ protocol CalendarAccessProviding: AnyObject {
     var authorizationStatus: CalendarAuthorizationStatus { get }
     var authorizationStatusPublisher: AnyPublisher<CalendarAuthorizationStatus, Never> { get }
     func requestAccess() async -> Bool
+    /// Re-reads the system permission, which can change behind the app's back (System Settings).
+    func refreshAuthorizationStatus()
 }
 
 /// What the island source needs on top of access: events in a range and a signal when the store changes.
@@ -25,36 +27,47 @@ protocol CalendarEventProviding: CalendarAccessProviding {
 
 /// EventKit shell. Creating it does not prompt; only `requestAccess()` does.
 @MainActor
-final class CalendarService: ObservableObject, CalendarEventProviding {
-    @Published private(set) var authorizationStatus: CalendarAuthorizationStatus
+final class CalendarService: CalendarEventProviding {
+    /// A CurrentValueSubject (not @Published) so subscribers see the new value when they are told about it.
+    private let statusSubject: CurrentValueSubject<CalendarAuthorizationStatus, Never>
 
     private let store = EKEventStore()
 
+    var authorizationStatus: CalendarAuthorizationStatus { statusSubject.value }
+
     var authorizationStatusPublisher: AnyPublisher<CalendarAuthorizationStatus, Never> {
-        $authorizationStatus.eraseToAnyPublisher()
+        statusSubject.eraseToAnyPublisher()
     }
 
     var changesPublisher: AnyPublisher<Void, Never> {
+        // Posted on arbitrary threads; consumers assume the main actor.
         NotificationCenter.default.publisher(for: .EKEventStoreChanged, object: store)
+            .receive(on: DispatchQueue.main)
             .map { _ in () }
             .eraseToAnyPublisher()
     }
 
     init() {
-        authorizationStatus = Self.currentStatus()
+        statusSubject = CurrentValueSubject(Self.currentStatus())
     }
 
     func requestAccess() async -> Bool {
         let granted = (try? await store.requestFullAccessToEvents()) ?? false
-        authorizationStatus = Self.currentStatus()
+        refreshAuthorizationStatus()
         return granted && authorizationStatus == .authorized
     }
 
+    func refreshAuthorizationStatus() {
+        let status = Self.currentStatus()
+        if status != statusSubject.value { statusSubject.send(status) }
+    }
+
     func events(from: Date, to: Date) -> [CalendarEventInfo] {
-        guard authorizationStatus == .authorized else { return [] }
+        // Read the live system state so a just-granted permission is never mistaken for the old one.
+        guard Self.currentStatus() == .authorized else { return [] }
         let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
         return store.events(matching: predicate)
-            .filter { !$0.isAllDay && $0.status != .canceled }
+            .filter { !$0.isAllDay && $0.status != .canceled && !Self.isDeclinedByCurrentUser($0) }
             .map { event in
                 CalendarEventInfo(
                     id: "\(event.eventIdentifier ?? event.calendarItemIdentifier)-\(Int(event.startDate.timeIntervalSince1970))",
@@ -64,6 +77,10 @@ final class CalendarService: ObservableObject, CalendarEventProviding {
                     location: event.location,
                     joinURL: CalendarWindow.joinURL(from: [event.location, event.notes, event.url?.absoluteString]))
             }
+    }
+
+    private static func isDeclinedByCurrentUser(_ event: EKEvent) -> Bool {
+        event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
     }
 
     private static func currentStatus() -> CalendarAuthorizationStatus {
