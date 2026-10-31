@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 28pt capsule used by the island's pickers and the Connect button.
+/// 28pt capsule used by the timer and calendar pages.
 struct IslandChipButtonStyle: ButtonStyle {
     /// White-filled with black text, for the Connect call to action.
     var prominent = false
@@ -46,25 +46,76 @@ struct IslandChipButtonStyle: ButtonStyle {
     }
 }
 
-/// Icon, label and an up/down chevron, laid out for a chip.
-private struct ChipLabel: View {
-    let systemImage: String
-    let iconSize: CGFloat
+/// 28pt uppercase text link used by the expanded player's source and output pickers and its Connect action:
+/// no fill at rest, a faint rounded background on hover.
+struct IslandLinkButtonStyle: ButtonStyle {
+    /// Accent-colored text, for the Connect call to action.
+    var accent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        LinkBody(configuration: configuration, accent: accent)
+    }
+
+    private struct LinkBody: View {
+        private enum Layout {
+            static let height: CGFloat = 28
+            static let horizontalPadding: CGFloat = 6
+            static let cornerRadius: CGFloat = 8
+        }
+
+        let configuration: ButtonStyleConfiguration
+        let accent: Bool
+
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.isFocused) private var isFocused
+        @State private var isHovering = false
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
+            configuration.label
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.5)
+                .textCase(.uppercase)
+                .padding(.horizontal, Layout.horizontalPadding)
+                .frame(height: Layout.height)
+                .foregroundStyle(foreground)
+                .background(shape.fill(isHovering || configuration.isPressed ? IslandTheme.linkHover : .clear))
+                .overlay(shape.strokeBorder(IslandTheme.focusRing, lineWidth: 2).opacity(isFocused ? 1 : 0))
+                .contentShape(shape)
+                .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : IslandTheme.dimmedOpacity)
+                .onHover { isHovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: isHovering)
+                .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+        }
+
+        private var foreground: Color {
+            if accent { return IslandTheme.accent }
+            return isHovering || configuration.isPressed ? IslandTheme.textPrimary : IslandTheme.textSecondary
+        }
+    }
+}
+
+/// Optional icon, title and a down chevron, laid out for a text link.
+private struct LinkLabel: View {
+    var systemImage: String?
     let title: String
+    /// Caps the title and chevron together; a truncated title leaves any slack after the chevron, not before it.
     var maxTitleWidth: CGFloat?
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: systemImage)
-                .font(.system(size: iconSize, weight: .medium))
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: maxTitleWidth, alignment: .leading)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(IslandTheme.textSecondary)
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            HStack(spacing: 4) {
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .heavy))
+            }
+            .frame(maxWidth: maxTitleWidth, alignment: .leading)
         }
     }
 }
@@ -84,33 +135,23 @@ struct SourceChip: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            ChipLabel(systemImage: icon, iconSize: 12, title: selection.displayName)
+            LinkLabel(title: selection.displayName)
         }
         .menuStyle(.button)
-        .buttonStyle(IslandChipButtonStyle())
+        .buttonStyle(IslandLinkButtonStyle())
         .menuIndicator(.hidden)
         .focusEffectDisabled()
         .fixedSize()
         .accessibilityLabel("Music source, \(selection.displayName)")
     }
-
-    private var icon: String {
-        switch selection {
-        case .appleMusic: "music.note"
-        case .spotify: "dot.radiowaves.left.and.right"
-        }
-    }
 }
 
 /// Picks the system audio output device.
 struct OutputChip: View {
-    private enum Layout {
-        // 180pt chip minus padding, icon, chevron and gaps.
-        static let maxTitleWidth: CGFloat = 124
-    }
-
     let outputs: [AudioOutput]
     let selectedID: String
+    /// Caps the device name (plus chevron) so long names truncate instead of crowding the row. Nil shows it in full.
+    var maxTitleWidth: CGFloat?
     let onSelect: (String) -> Void
 
     var body: some View {
@@ -128,19 +169,26 @@ struct OutputChip: View {
                 .labelsHidden()
             }
         } label: {
-            ChipLabel(systemImage: "airplayaudio", iconSize: 14, title: selectedName,
-                      maxTitleWidth: Layout.maxTitleWidth)
+            LinkLabel(systemImage: icon, title: selectedName, maxTitleWidth: maxTitleWidth)
         }
         .menuStyle(.button)
-        .buttonStyle(IslandChipButtonStyle())
+        .buttonStyle(IslandLinkButtonStyle())
         .menuIndicator(.hidden)
         .focusEffectDisabled()
         .fixedSize()
         .accessibilityLabel("Audio output, \(selectedName)")
     }
 
+    private var selected: AudioOutput? {
+        outputs.first(where: { $0.id == selectedID })
+    }
+
+    private var icon: String {
+        selected?.isBluetooth == true ? "headphones" : "hifispeaker.fill"
+    }
+
     private var selectedName: String {
-        if let selected = outputs.first(where: { $0.id == selectedID }) {
+        if let selected {
             return selected.name
         }
         return outputs.isEmpty ? "No Outputs" : "Output"

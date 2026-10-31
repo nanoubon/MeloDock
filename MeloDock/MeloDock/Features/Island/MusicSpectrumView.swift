@@ -12,6 +12,10 @@ struct MusicSpectrumView: View {
     var barWidth: CGFloat = 2.8
     var barHeight: CGFloat = 12
     var barSpacing: CGFloat = 2.4
+    /// Solid bar color. Nil keeps the default cool gradient.
+    var tint: Color? = nil
+    /// Bar corner radius. Nil draws capsules.
+    var barCornerRadius: CGFloat? = nil
 
     private enum Layout {
         static let minScale: CGFloat = 0.18
@@ -39,7 +43,7 @@ struct MusicSpectrumView: View {
     private func bars(active: Bool, heightScale: @escaping (Int) -> CGFloat) -> some View {
         HStack(alignment: .bottom, spacing: barSpacing) {
             ForEach(0..<barCount, id: \.self) { index in
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: barCornerRadius ?? barWidth / 2, style: .continuous)
                     .fill(barGradient(for: index, active: active))
                     .frame(width: barWidth, height: barHeight)
                     .scaleEffect(
@@ -54,6 +58,11 @@ struct MusicSpectrumView: View {
 
     private func barGradient(for index: Int, active: Bool) -> LinearGradient {
         let ratio = Double(index) / Double(max(barCount - 1, 1))
+
+        if let tint {
+            let color = active ? tint : tint.opacity(0.5)
+            return LinearGradient(colors: [color, color], startPoint: .top, endPoint: .bottom)
+        }
 
         if active {
             let startHue = 0.58 - (ratio * 0.14)

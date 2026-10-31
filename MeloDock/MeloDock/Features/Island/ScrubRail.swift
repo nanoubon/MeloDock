@@ -33,7 +33,8 @@ enum ScrubRailMath {
     }
 }
 
-/// A thin capsule rail. With `onChange` it is a slider whose rail grows and shows a knob on hover or drag;
+/// A thin capsule rail. With `onChange` it is a slider that shows a knob (and, unless `growsWhenActive` is off,
+/// thickens) on hover or drag;
 /// without it, it only displays a value.
 struct ScrubRail: View {
     private enum Layout {
@@ -48,6 +49,9 @@ struct ScrubRail: View {
     let accessibilityLabel: String
     let accessibilityValue: String
     var onChange: ((Double) -> Void)?
+    var track: Color = IslandTheme.railTrack
+    /// Whether the rail thickens on hover or drag; the knob still appears either way.
+    var growsWhenActive = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
@@ -76,11 +80,11 @@ struct ScrubRail: View {
     private var rail: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            let railHeight = isActive ? Layout.activeRailHeight : Layout.railHeight
+            let railHeight = isActive && growsWhenActive ? Layout.activeRailHeight : Layout.railHeight
 
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
-                    .fill(IslandTheme.railTrack)
+                    .fill(track)
                     .frame(height: railHeight)
 
                 Capsule(style: .continuous)
