@@ -8,7 +8,7 @@ MeloDock is a macOS 14+ menu-bar app (SwiftUI + AppKit, Swift 5, no third-party 
 
 ## Build and run
 
-The Xcode project lives one level down: `MeloDock/MeloDock.xcodeproj`, with the app target `MeloDock` (bundle id `com.nano.melodock`), the test target `MeloDockTests`, and one shared scheme `MeloDock`. On this machine `xcode-select` points at the Command Line Tools, which can't build the project, so run `xcodebuild` with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` set (no `sudo` needed). Signing uses "Sign to Run Locally", so no team or extra flags are required.
+The Xcode project lives one level down: `MeloDock/MeloDock.xcodeproj`, with the app target `MeloDock` (bundle id `com.nano.melodock`), the test target `MeloDockTests`, and one shared scheme `MeloDock`. On this machine `xcode-select` points at the Command Line Tools, which can't build the project, so run `xcodebuild` with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` set (no `sudo` needed). Signing uses automatic signing with the Apple Development certificate of team `F74446W6S9` (set as `DEVELOPMENT_TEAM` on the app target), so the code signature stays the same across rebuilds and Keychain "Always Allow" grants persist. On another machine, replace the team with your own (or clear it for ad-hoc "Sign to Run Locally"); no extra build flags are required.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project MeloDock/MeloDock.xcodeproj -scheme MeloDock -configuration Debug build
