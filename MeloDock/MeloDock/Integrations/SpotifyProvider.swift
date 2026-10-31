@@ -22,6 +22,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
     private var pendingState: String?
 
     private var cachedIsPlaying = false
+    private var cachedToken: SpotifyToken?
     private let tokenKey = "spotify.oauth.token"
 
     var authState: ProviderAuthState { authSubject.value }
@@ -169,6 +170,7 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
 
     func clearSession() throws {
         try keychainService.removeValue(for: tokenKey)
+        cachedToken = nil
         authSubject.send(.unauthorized)
         playbackSubject.send(.unavailable(provider: .spotify, message: "Spotify session cleared."))
     }
@@ -369,11 +371,16 @@ final class SpotifyProvider: NSObject, MusicProvider, ASWebAuthenticationPresent
     private func saveToken(_ token: SpotifyToken) throws {
         let data = try JSONEncoder().encode(token)
         try keychainService.set(data: data, for: tokenKey)
+        cachedToken = token
     }
 
+    /// Keeps the token in memory after the first read so polling does not hit the Keychain every cycle.
     private func loadToken() -> SpotifyToken? {
-        guard let data = keychainService.data(for: tokenKey) else { return nil }
-        return try? JSONDecoder().decode(SpotifyToken.self, from: data)
+        if let cachedToken { return cachedToken }
+        guard let data = keychainService.data(for: tokenKey),
+              let token = try? JSONDecoder().decode(SpotifyToken.self, from: data) else { return nil }
+        cachedToken = token
+        return token
     }
 
     private static let redirectURI = "melodock://spotify-auth"
