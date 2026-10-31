@@ -5,7 +5,7 @@ import Foundation
 /// else does. Sampling runs only while the Settings switch is on; the coordinator's kind filter does the showing.
 @MainActor
 final class NetworkActivitySource: ActivitySource {
-    static let activity = IslandActivity(id: "network", kind: .network,
+    nonisolated static let activity = IslandActivity(id: "network", kind: .network,
                                          priority: IslandActivity.Priority.network, detail: .network)
 
     private var cancellable: AnyCancellable?

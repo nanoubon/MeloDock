@@ -94,5 +94,38 @@ final class SpectrumWiringTests: XCTestCase {
         XCTAssertEqual(statuses, [.off])
         XCTAssertTrue(levels.allSatisfy { $0 == nil })
     }
+    // Bug 2: a silent start used to tear down the last tap for good and show a false permission error.
+    func testSilentStartTriesTheNextTargetThenKeepsListening() {
+        XCTAssertEqual(SpectrumTapStep.step(for: .silent, attempt: 0, of: 2), .tryNext)
+        XCTAssertEqual(SpectrumTapStep.step(for: .silent, attempt: 1, of: 2), .reportDenied)
+        // The same open tap hears the intro end: it publishes again instead of staying denied.
+        XCTAssertEqual(SpectrumTapStep.step(for: .heardAudio, attempt: 1, of: 2), .publish)
+        XCTAssertEqual(SpectrumTapStep.step(for: .waiting, attempt: 0, of: 2), .wait)
+    }
+
+    func testMonitorRecoversAfterASilentVerdict() {
+        let t0 = Date(timeIntervalSinceReferenceDate: 0)
+        var monitor = TapSilenceMonitor(startedAt: t0)
+        monitor.record(rms: 0)
+        XCTAssertEqual(monitor.verdict(at: t0.addingTimeInterval(10)), .silent)
+        monitor.record(rms: 0.1)
+        XCTAssertEqual(monitor.verdict(at: t0.addingTimeInterval(11)), .heardAudio)
+    }
+
+    // Bug 3: an old macOS was reported only once music played; Settings said "Ready" until then.
+    func testOldMacOSIsReportedAsSoonAsTheSwitchIsOn() {
+        var statuses: [SpectrumStatus] = []
+        let enabled = CurrentValueSubject<Bool, Never>(false)
+        let service = CoreAudioTapSpectrumService(
+            isEnabled: enabled.eraseToAnyPublisher(), isPlaying: Just(false).eraseToAnyPublisher(),
+            provider: Just(.spotify).eraseToAnyPublisher(), tapsSupported: false)
+        let c = service.statusPublisher.sink { statuses.append($0) }
+        defer { c.cancel() }
+        XCTAssertEqual(statuses, [.off])
+        enabled.send(true)
+        XCTAssertEqual(statuses, [.off, .unsupported])
+        enabled.send(false)
+        XCTAssertEqual(statuses, [.off, .unsupported, .off])
+    }
 }
 #endif

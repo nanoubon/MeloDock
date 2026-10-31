@@ -27,6 +27,24 @@ extension MusicProviderKind {
     }
 }
 
+/// What the service does with a tap's silence verdict.
+enum SpectrumTapStep: Equatable {
+    case wait
+    case publish
+    /// Silent, and another target is left to try.
+    case tryNext
+    /// Silent on the last target: report it, but keep listening.
+    case reportDenied
+
+    static func step(for verdict: TapSilenceMonitor.Verdict, attempt index: Int, of count: Int) -> SpectrumTapStep {
+        switch verdict {
+        case .heardAudio: .publish
+        case .waiting: .wait
+        case .silent: index + 1 < count ? .tryNext : .reportDenied
+        }
+    }
+}
+
 private protocol TapSessionControlling: AnyObject {
     func stop()
 }
@@ -37,9 +55,17 @@ private protocol TapSessionControlling: AnyObject {
 @MainActor
 final class CoreAudioTapSpectrumService: SpectrumSource {
     private struct Desired: Equatable {
-        var active: Bool
+        var enabled: Bool
+        var playing: Bool
         var provider: MusicProviderKind
     }
+
+    nonisolated static var systemSupportsTaps: Bool {
+        if #available(macOS 14.2, *) { return true }
+        return false
+    }
+
+    private let tapsSupported: Bool
 
     private let levelsSubject = CurrentValueSubject<[Float]?, Never>(nil)
     private let statusSubject = CurrentValueSubject<SpectrumStatus, Never>(.off)
@@ -52,21 +78,27 @@ final class CoreAudioTapSpectrumService: SpectrumSource {
     var statusPublisher: AnyPublisher<SpectrumStatus, Never> { statusSubject.removeDuplicates().eraseToAnyPublisher() }
 
     init(isEnabled: AnyPublisher<Bool, Never>, isPlaying: AnyPublisher<Bool, Never>,
-         provider: AnyPublisher<MusicProviderKind, Never>) {
+         provider: AnyPublisher<MusicProviderKind, Never>, tapsSupported: Bool = systemSupportsTaps) {
+        self.tapsSupported = tapsSupported
         cancellable = Publishers.CombineLatest3(isEnabled, isPlaying, provider)
-            .map { Desired(active: $0 && $1, provider: $2) }
+            .map { Desired(enabled: $0, playing: $1, provider: $2) }
             .removeDuplicates()
             .sink { [weak self] desired in self?.apply(desired) }
     }
 
     private func apply(_ desired: Desired) {
         stopSession()
-        guard desired.active else {
+        // An old macOS is reported as soon as the switch is on, not only once music plays.
+        guard desired.enabled else {
             statusSubject.send(.off)
             return
         }
-        guard #available(macOS 14.2, *) else {
+        guard tapsSupported, #available(macOS 14.2, *) else {
             statusSubject.send(.unsupported)
+            return
+        }
+        guard desired.playing else {
+            statusSubject.send(.off)
             return
         }
         statusSubject.send(.waiting)
@@ -97,17 +129,20 @@ final class CoreAudioTapSpectrumService: SpectrumSource {
     private func receive(levels: [Float], rms: Float, generation: Int, targets: [SpectrumTapTarget], index: Int) {
         guard generation == self.generation else { return }
         monitor.record(rms: rms)
-        switch monitor.verdict(at: Date()) {
-        case .heardAudio:
+        switch SpectrumTapStep.step(for: monitor.verdict(at: Date()), attempt: index, of: targets.count) {
+        case .publish:
             statusSubject.send(.live)
             levelsSubject.send(levels)
-        case .waiting:
+        case .wait:
             break
-        case .silent:
+        case .tryNext:
             // This target is deaf: drop it and try the next one.
             session?.stop()
             session = nil
             run(targets, at: index + 1, generation: generation)
+        case .reportDenied:
+            // Keep the last tap open: a silent intro or a muted app recovers here as soon as sound arrives.
+            statusSubject.send(.denied)
         }
     }
 
