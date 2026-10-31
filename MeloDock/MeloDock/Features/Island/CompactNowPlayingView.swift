@@ -54,6 +54,7 @@ struct CompactNowPlayingView: View {
             seed: viewModel.spectrumSeed,
             progress: viewModel.spectrumProgress,
             tempoBPM: viewModel.spectrumTempoBPM,
+            levels: viewModel.spectrumLevels,
             barCount: barCount,
             barWidth: barWidth,
             barSpacing: barSpacing

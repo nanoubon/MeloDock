@@ -5,6 +5,8 @@ struct MusicSpectrumView: View {
     let seed: Int
     let progress: TimeInterval
     let tempoBPM: Double
+    /// Real audio levels, one per band. When present the bars follow them; otherwise the synthetic animation runs.
+    var levels: [Float]? = nil
     // Bar geometry; the defaults are the compact ear's look.
     var barCount = 14
     var barWidth: CGFloat = 2.8
@@ -18,19 +20,23 @@ struct MusicSpectrumView: View {
 
     var body: some View {
         Group {
-            if isActive {
+            if let levels, !levels.isEmpty {
+                let heights = SpectrumLevels.resample(levels, to: barCount)
+                bars(active: true) { Layout.minScale + CGFloat(heights[$0]) * (Layout.maxScale - Layout.minScale) }
+                    .animation(.easeOut(duration: 0.08), value: levels)
+            } else if isActive {
                 TimelineView(.periodic(from: .now, by: 1.0 / 15.0)) { _ in
-                    bars(for: progress, active: true)
+                    bars(active: true) { scale(for: $0, at: progress) }
                 }
             } else {
-                bars(for: progress, active: false)
+                bars(active: false) { _ in 0.22 }
             }
         }
         .frame(height: barHeight)
         .accessibilityLabel("Music Spectrum")
     }
 
-    private func bars(for time: TimeInterval, active: Bool) -> some View {
+    private func bars(active: Bool, heightScale: @escaping (Int) -> CGFloat) -> some View {
         HStack(alignment: .bottom, spacing: barSpacing) {
             ForEach(0..<barCount, id: \.self) { index in
                 Capsule(style: .continuous)
@@ -38,7 +44,7 @@ struct MusicSpectrumView: View {
                     .frame(width: barWidth, height: barHeight)
                     .scaleEffect(
                         x: 1,
-                        y: active ? scale(for: index, at: time) : 0.22,
+                        y: heightScale(index),
                         anchor: .bottom
                     )
             }

@@ -120,6 +120,7 @@ struct ExpandedMusicView: View {
                         seed: viewModel.spectrumSeed,
                         progress: viewModel.spectrumProgress,
                         tempoBPM: viewModel.spectrumTempoBPM,
+                        levels: viewModel.spectrumLevels,
                         barCount: 5,
                         barWidth: 3,
                         barHeight: Layout.spectrumHeight,

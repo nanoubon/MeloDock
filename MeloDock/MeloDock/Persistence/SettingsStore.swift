@@ -55,6 +55,11 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(showNetwork, forKey: Keys.showNetwork) }
     }
 
+    /// Off by default: turning it on makes macOS ask for System Audio Recording, so the user opts in.
+    @Published var showLiveSpectrum: Bool {
+        didSet { defaults.set(showLiveSpectrum, forKey: Keys.showLiveSpectrum) }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -70,6 +75,7 @@ final class SettingsStore: ObservableObject {
         showTimer = defaults.object(forKey: Keys.showTimer) as? Bool ?? true
         showCalendar = defaults.object(forKey: Keys.showCalendar) as? Bool ?? false
         showNetwork = defaults.object(forKey: Keys.showNetwork) as? Bool ?? true
+        showLiveSpectrum = defaults.object(forKey: Keys.showLiveSpectrum) as? Bool ?? false
         overlayVisible = false // session-only: the island always starts collapsed
 
         if let data = defaults.data(forKey: Keys.hotkey),
@@ -94,4 +100,5 @@ private enum Keys {
     static let showTimer = "settings.island.timer"
     static let showCalendar = "settings.island.calendar"
     static let showNetwork = "settings.island.network"
+    static let showLiveSpectrum = "settings.island.liveSpectrum"
 }

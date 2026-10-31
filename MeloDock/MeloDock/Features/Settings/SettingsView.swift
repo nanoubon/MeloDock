@@ -28,6 +28,15 @@ struct SettingsView: View {
                 Toggle("Microphone in use", isOn: $viewModel.showCapture)
                 Toggle("Timer", isOn: $viewModel.showTimer)
                 Toggle("Network speed", isOn: $viewModel.showNetwork)
+                Toggle("Live spectrum", isOn: $viewModel.showLiveSpectrum)
+                Text(SpectrumStatusText.caption(enabled: viewModel.showLiveSpectrum, status: viewModel.spectrumStatus))
+                    .font(.caption)
+                    .foregroundStyle(viewModel.spectrumStatus == .denied ? Color.orange : Color.secondary)
+                if viewModel.spectrumStatus == .denied {
+                    Button("Open System Settings") {
+                        viewModel.openAudioCapturePrivacySettings()
+                    }
+                }
                 Toggle("Calendar", isOn: Binding(
                     get: { viewModel.showCalendar },
                     set: { enabled in Task { await viewModel.setCalendarEnabled(enabled) } }

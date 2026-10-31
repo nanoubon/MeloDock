@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Not in Xcode's INFOPLIST_KEY_* allow-list, so a build setting would be dropped silently. -->
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>MeloDock listens to the audio that is playing to animate the spectrum on the island. Audio is analyzed live and never recorded.</string>
+</dict>
+</plist>

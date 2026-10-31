@@ -10,6 +10,8 @@ final class IslandViewModel: ObservableObject {
     @Published var volume: Float = 0.5
     @Published var selectedOutputID: String = ""
     @Published var selectedProvider: MusicProviderKind
+    /// Real audio levels while the live spectrum is running; nil means the synthetic animation.
+    @Published private(set) var spectrumLevels: [Float]?
 
     private let settingsStore: SettingsStore
     private let musicProviders: [MusicProviderKind: MusicProvider]
@@ -18,6 +20,8 @@ final class IslandViewModel: ObservableObject {
     private var providerCancellables = Set<AnyCancellable>()
     private var cancellables = Set<AnyCancellable>()
     private var pollCancellable: AnyCancellable?
+    private var spectrumSource: SpectrumSource?
+    private var spectrumCancellable: AnyCancellable?
     private var progressTickCancellable: AnyCancellable?
     private var isRefreshing = false
     private var hiddenTickCounter = 0
@@ -41,6 +45,13 @@ final class IslandViewModel: ObservableObject {
         switchProvider(to: initialProvider)
         startPolling()
         startProgressTicker()
+    }
+
+    /// The source needs this view model's publishers, so it is attached after construction.
+    func bindSpectrum(_ source: SpectrumSource) {
+        spectrumSource = source
+        spectrumCancellable = source.levelsPublisher
+            .sink { [weak self] levels in self?.spectrumLevels = levels }
     }
 
     func bootstrap() async {

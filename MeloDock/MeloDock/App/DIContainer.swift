@@ -16,12 +16,25 @@ final class DIContainer: ObservableObject {
     let proFeatureService: ProFeatureService
 
     lazy var islandViewModel: IslandViewModel = {
-        IslandViewModel(
+        let viewModel = IslandViewModel(
             settingsStore: settingsStore,
             musicProviders: musicProviders,
             audioDeviceProvider: audioDeviceProvider
         )
+        // Listens only while the Settings switch is on and music plays; it needs the view model's publishers,
+        // so it is built here and handed back to the view model.
+        let spectrum = CoreAudioTapSpectrumService(
+            isEnabled: settingsStore.$showLiveSpectrum.eraseToAnyPublisher(),
+            isPlaying: viewModel.$playbackState.map(\.isPlaying).eraseToAnyPublisher(),
+            provider: viewModel.$selectedProvider.eraseToAnyPublisher()
+        )
+        viewModel.bindSpectrum(spectrum)
+        spectrumSource = spectrum
+        return viewModel
     }()
+
+    // Held here and by the view model; Settings reads its status.
+    private(set) var spectrumSource: SpectrumSource?
 
     lazy var islandCoordinator: IslandCoordinator = {
         let coordinator = IslandCoordinator(
@@ -39,13 +52,15 @@ final class DIContainer: ObservableObject {
     }()
 
     lazy var settingsViewModel: SettingsViewModel = {
-        SettingsViewModel(
+        _ = islandViewModel // builds the spectrum source
+        return SettingsViewModel(
             settingsStore: settingsStore,
             launchAtLoginService: launchAtLoginService,
             musicProviders: musicProviders,
             spotifyProvider: spotifyProvider,
             proFeatureService: proFeatureService,
-            calendarAccess: calendarService
+            calendarAccess: calendarService,
+            spectrumStatus: spectrumSource?.statusPublisher ?? Just(.off).eraseToAnyPublisher()
         )
     }()
 

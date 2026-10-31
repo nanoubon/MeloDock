@@ -13,6 +13,8 @@ final class SettingsViewModel: ObservableObject {
     @Published var showCapture: Bool
     @Published var showTimer: Bool
     @Published var showNetwork: Bool
+    @Published var showLiveSpectrum: Bool
+    @Published private(set) var spectrumStatus: SpectrumStatus = .off
     /// Changed only through `setCalendarEnabled`, so it never turns on without permission.
     @Published private(set) var showCalendar: Bool
     @Published private(set) var calendarAccessDenied = false
@@ -42,6 +44,7 @@ final class SettingsViewModel: ObservableObject {
         spotifyProvider: SpotifyProvider,
         proFeatureService: ProFeatureService,
         calendarAccess: CalendarAccessProviding,
+        spectrumStatus: AnyPublisher<SpectrumStatus, Never> = Just(.off).eraseToAnyPublisher(),
         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
         notificationCenter: NotificationCenter = .default
     ) {
@@ -63,10 +66,14 @@ final class SettingsViewModel: ObservableObject {
         showCapture = settingsStore.showCapture
         showTimer = settingsStore.showTimer
         showNetwork = settingsStore.showNetwork
+        showLiveSpectrum = settingsStore.showLiveSpectrum
         showCalendar = settingsStore.showCalendar
 
         bindSettings()
         bindServices()
+        spectrumStatus
+            .sink { [weak self] in self?.spectrumStatus = $0 }
+            .store(in: &cancellables)
 
         Task {
             await refreshProviderStates()
@@ -127,6 +134,11 @@ final class SettingsViewModel: ObservableObject {
         calendarAccess.refreshAuthorizationStatus()
     }
 
+    func openAudioCapturePrivacySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") else { return }
+        openURL(url)
+    }
+
     func openCalendarPrivacySettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") else { return }
         openURL(url)
@@ -183,6 +195,11 @@ final class SettingsViewModel: ObservableObject {
         $showNetwork
             .dropFirst()
             .sink { [weak self] in self?.settingsStore.showNetwork = $0 }
+            .store(in: &cancellables)
+
+        $showLiveSpectrum
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showLiveSpectrum = $0 }
             .store(in: &cancellables)
 
         $launchAtLogin
