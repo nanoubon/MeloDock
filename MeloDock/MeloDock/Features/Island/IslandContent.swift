@@ -6,6 +6,8 @@ enum CompactContent: Equatable {
     case timer
     /// Calendar ears read `CalendarActivitySource.activeEvent`.
     case calendar
+    /// Network ears read the `NetworkSpeedModel`; the activity carries no payload.
+    case network
     /// No primary activity (or a kind without ears): the ears stay empty.
     case empty
 
@@ -16,6 +18,7 @@ enum CompactContent: Equatable {
         case let (.capture, .capture(mic, camera)): return .capture(mic: mic, camera: camera)
         case (.timer, _): return .timer
         case (.calendar, _): return .calendar
+        case (.network, _): return .network
         default: return .empty
         }
     }

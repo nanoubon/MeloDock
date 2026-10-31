@@ -192,12 +192,13 @@ final class IslandCoordinator: ObservableObject {
 extension SettingsStore {
     /// Kinds the island should show, re-evaluated whenever a per-activity switch changes.
     var enabledKindsPublisher: AnyPublisher<Set<IslandActivity.Kind>, Never> {
-        Publishers.CombineLatest(
+        Publishers.CombineLatest3(
             Publishers.CombineLatest3($showPower, $showAudio, $showCapture),
-            Publishers.CombineLatest($showTimer, $showCalendar)
+            Publishers.CombineLatest($showTimer, $showCalendar),
+            $showNetwork
         )
             .map { IslandKindFilter.enabledKinds(showPower: $0.0, showAudio: $0.1, showCapture: $0.2,
-                                                 showTimer: $1.0, showCalendar: $1.1) }
+                                                 showTimer: $1.0, showCalendar: $1.1, showNetwork: $2) }
             .removeDuplicates()
             .eraseToAnyPublisher()
     }

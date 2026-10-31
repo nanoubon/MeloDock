@@ -31,6 +31,7 @@ struct IslandShellView: View {
     let viewModel: IslandViewModel
     let timerModel: TimerModel
     let calendarSource: CalendarActivitySource
+    let networkModel: NetworkSpeedModel
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The mode the shape last settled toward; tells a collapse apart from idle/compact changes.
@@ -112,13 +113,17 @@ struct IslandShellView: View {
     private var compactContent: some View {
         switch CompactContent.make(for: coordinator.selection.primary) {
         case .nowPlaying:
-            CompactNowPlayingView(viewModel: viewModel)
+            CompactNowPlayingView(
+                viewModel: viewModel,
+                networkModel: coordinator.enabledKinds.contains(.network) ? networkModel : nil)
         case let .capture(mic, camera):
             CompactCaptureView(mic: mic, camera: camera)
         case .timer:
             CompactTimerView(model: timerModel)
         case .calendar:
             CompactCalendarView(source: calendarSource)
+        case .network:
+            CompactNetworkView(model: networkModel)
         case .empty:
             Color.clear
         }

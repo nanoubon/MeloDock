@@ -26,13 +26,13 @@ final class DIContainer: ObservableObject {
     lazy var islandCoordinator: IslandCoordinator = {
         let coordinator = IslandCoordinator(
             sources: [nowPlayingActivitySource, powerActivitySource, audioActivitySource, captureActivitySource,
-                      timerActivitySource, calendarActivitySource],
+                      timerActivitySource, calendarActivitySource, networkActivitySource],
             isIslandEnabled: settingsStore.showOnStartup
         )
         settingsStore.$showOnStartup
             .removeDuplicates()
             .assign(to: &coordinator.$isIslandEnabled)
-        // Power, audio and capture can each be switched off in Settings; the coordinator filters by kind.
+        // Every kind except now playing can be switched off in Settings; the coordinator filters by kind.
         settingsStore.enabledKindsPublisher
             .assign(to: &coordinator.$enabledKinds)
         return coordinator
@@ -56,6 +56,14 @@ final class DIContainer: ObservableObject {
     lazy var timerModel = TimerModel()
 
     private lazy var timerActivitySource = TimerActivitySource(model: timerModel)
+
+    // Held strongly like the timer model; it samples only while the Settings switch is on.
+    lazy var networkSpeedModel = NetworkSpeedModel()
+
+    private lazy var networkActivitySource = NetworkActivitySource(
+        model: networkSpeedModel,
+        isEnabled: settingsStore.$showNetwork.eraseToAnyPublisher()
+    )
 
     // Inert until calendar access is granted from Settings; never prompts by itself.
     lazy var calendarActivitySource = CalendarActivitySource(provider: calendarService)

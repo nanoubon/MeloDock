@@ -30,6 +30,31 @@ final class IslandSelectionTests: XCTestCase {
         XCTAssertEqual(s.secondary, b)
     }
 
+    func testNetworkAloneIsPrimaryWithoutSecondary() {
+        let net = activity("net", .network, IslandActivity.Priority.network)
+        let s = IslandSelection.select(from: [net])
+        XCTAssertEqual(s.primary, net)
+        XCTAssertNil(s.secondary)
+    }
+
+    func testEveryOtherActivityOutranksNetwork() {
+        let net = activity("net", .network, IslandActivity.Priority.network)
+        let paused = activity("np", .nowPlaying, IslandActivity.Priority.nowPlayingPaused)
+        let s = IslandSelection.select(from: [net, paused])
+        XCTAssertEqual(s.primary, paused)
+        XCTAssertNil(s.secondary)
+    }
+
+    func testNetworkNeverTakesTheSecondarySlot() {
+        let net = activity("net", .network, IslandActivity.Priority.network)
+        let timer = activity("timer", .timer, IslandActivity.Priority.timer)
+        let playing = activity("np", .nowPlaying, IslandActivity.Priority.nowPlayingPlaying)
+        let s = IslandSelection.select(from: [net, timer, playing])
+        XCTAssertEqual(s.primary, timer)
+        XCTAssertEqual(s.secondary, playing)
+        XCTAssertNil(IslandSelection.select(from: [net, timer]).secondary)
+    }
+
     func testSingleActivityHasNoSecondary() {
         let a = activity("a", .audio, 50)
         let s = IslandSelection.select(from: [a])

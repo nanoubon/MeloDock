@@ -31,6 +31,10 @@ struct SecondaryCircleView: View {
         case .calendar:
             Image(systemName: "calendar").font(.system(size: diameter * 0.42, weight: .semibold))
                 .foregroundStyle(.red)
+        case .network:
+            // Selection never gives the network the secondary slot; this only keeps the switch exhaustive.
+            Image(systemName: "arrow.up.arrow.down").font(.system(size: diameter * 0.42, weight: .semibold))
+                .foregroundStyle(IslandTheme.textPrimary)
         }
     }
 
@@ -41,6 +45,7 @@ struct SecondaryCircleView: View {
         case .nowPlaying: "Now playing"
         case .timer: "Timer"
         case .calendar: "Calendar"
+        case .network: "Network speed"
         }
     }
 }

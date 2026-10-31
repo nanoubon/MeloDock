@@ -403,5 +403,40 @@ final class IslandCoordinatorTests: XCTestCase {
         c.enabledKinds = IslandKindFilter.all.subtracting([.timer])
         XCTAssertEqual(c.tabs, [.nowPlaying])
     }
+
+    private var network: IslandActivity { NetworkActivitySource.activity }
+
+    func testNetworkAloneKeepsTheIslandCompactInsteadOfIdle() {
+        let (c, source) = make()
+        XCTAssertEqual(c.mode, .idle)
+        source.subject.send([network])
+        XCTAssertEqual(c.mode, .compact)
+        XCTAssertEqual(c.selection.primary, network)
+        XCTAssertNil(c.selection.secondary)
+    }
+
+    func testSwitchingNetworkOffReturnsToIdle() {
+        let (c, source) = make()
+        source.subject.send([network])
+        c.enabledKinds = IslandKindFilter.all.subtracting([.network])
+        XCTAssertEqual(c.mode, .idle)
+        c.enabledKinds = IslandKindFilter.all
+        XCTAssertEqual(c.mode, .compact)
+    }
+
+    func testOtherActivityTakesThePrimaryFromNetworkAndGivesItBack() {
+        let (c, source) = make()
+        source.subject.send([network, activity("np")])
+        XCTAssertEqual(c.selection.primary?.id, "np")
+        XCTAssertNil(c.selection.secondary)
+        source.subject.send([network])
+        XCTAssertEqual(c.selection.primary, network)
+    }
+
+    func testNetworkNeverAddsAnExpandedTab() {
+        let (c, source) = make()
+        source.subject.send([network])
+        XCTAssertEqual(c.tabs, [.nowPlaying, .timer])
+    }
 }
 #endif

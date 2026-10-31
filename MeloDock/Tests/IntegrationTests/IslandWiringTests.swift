@@ -52,6 +52,15 @@ final class IslandKindFilterTests: XCTestCase {
         XCTAssertTrue(noCalendar.contains(.timer) && noCalendar.contains(.nowPlaying))
     }
 
+    func testNetworkSwitchGatesItsKindAndDefaultsOn() {
+        let noNetwork = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true,
+                                                      showTimer: true, showCalendar: true, showNetwork: false)
+        XCTAssertEqual(noNetwork, IslandKindFilter.all.subtracting([.network]))
+        let defaulted = IslandKindFilter.enabledKinds(showPower: true, showAudio: true, showCapture: true,
+                                                      showTimer: true, showCalendar: true)
+        XCTAssertTrue(defaulted.contains(.network))
+    }
+
     func testTransientQueueRemoveKind() {
         let t0 = Date(timeIntervalSinceReferenceDate: 100)
         func item(_ id: String, _ kind: IslandActivity.Kind) -> IslandTransient {

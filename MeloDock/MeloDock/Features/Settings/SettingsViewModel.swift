@@ -12,6 +12,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var showAudio: Bool
     @Published var showCapture: Bool
     @Published var showTimer: Bool
+    @Published var showNetwork: Bool
     /// Changed only through `setCalendarEnabled`, so it never turns on without permission.
     @Published private(set) var showCalendar: Bool
     @Published private(set) var calendarAccessDenied = false
@@ -61,6 +62,7 @@ final class SettingsViewModel: ObservableObject {
         showAudio = settingsStore.showAudio
         showCapture = settingsStore.showCapture
         showTimer = settingsStore.showTimer
+        showNetwork = settingsStore.showNetwork
         showCalendar = settingsStore.showCalendar
 
         bindSettings()
@@ -176,6 +178,11 @@ final class SettingsViewModel: ObservableObject {
         $showTimer
             .dropFirst()
             .sink { [weak self] in self?.settingsStore.showTimer = $0 }
+            .store(in: &cancellables)
+
+        $showNetwork
+            .dropFirst()
+            .sink { [weak self] in self?.settingsStore.showNetwork = $0 }
             .store(in: &cancellables)
 
         $launchAtLogin

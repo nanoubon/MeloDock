@@ -31,7 +31,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panelController = IslandPanelController(
             coordinator: coordinator, viewModel: container.islandViewModel,
-            timerModel: container.timerModel, calendarSource: container.calendarActivitySource)
+            timerModel: container.timerModel, calendarSource: container.calendarActivitySource,
+            networkModel: container.networkSpeedModel)
     }
 
     private func configureStatusItem() {

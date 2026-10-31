@@ -110,6 +110,20 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testNetworkSpeedDefaultsOnAndPersistsUnderItsKey() {
+        let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.showNetwork)
+        store.showNetwork = false
+        XCTAssertEqual(defaults.object(forKey: "settings.island.network") as? Bool, false)
+        XCTAssertFalse(SettingsStore(defaults: defaults).showNetwork)
+    }
+
+    @MainActor
     func testTimerAndCalendarPersistUnderTheirKeys() {
         let suiteName = "SettingsStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

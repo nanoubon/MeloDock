@@ -51,6 +51,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(showCalendar, forKey: Keys.showCalendar) }
     }
 
+    @Published var showNetwork: Bool {
+        didSet { defaults.set(showNetwork, forKey: Keys.showNetwork) }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -65,6 +69,7 @@ final class SettingsStore: ObservableObject {
         showCapture = defaults.object(forKey: Keys.showCapture) as? Bool ?? true
         showTimer = defaults.object(forKey: Keys.showTimer) as? Bool ?? true
         showCalendar = defaults.object(forKey: Keys.showCalendar) as? Bool ?? false
+        showNetwork = defaults.object(forKey: Keys.showNetwork) as? Bool ?? true
         overlayVisible = false // session-only: the island always starts collapsed
 
         if let data = defaults.data(forKey: Keys.hotkey),
@@ -88,4 +93,5 @@ private enum Keys {
     static let showCapture = "settings.island.capture"
     static let showTimer = "settings.island.timer"
     static let showCalendar = "settings.island.calendar"
+    static let showNetwork = "settings.island.network"
 }

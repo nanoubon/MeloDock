@@ -27,6 +27,7 @@ struct SettingsView: View {
                 Toggle("Audio and Bluetooth", isOn: $viewModel.showAudio)
                 Toggle("Microphone in use", isOn: $viewModel.showCapture)
                 Toggle("Timer", isOn: $viewModel.showTimer)
+                Toggle("Network speed", isOn: $viewModel.showNetwork)
                 Toggle("Calendar", isOn: Binding(
                     get: { viewModel.showCalendar },
                     set: { enabled in Task { await viewModel.setCalendarEnabled(enabled) } }

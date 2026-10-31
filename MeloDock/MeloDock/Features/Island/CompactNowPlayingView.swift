@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Compact ears for now playing: artwork on the leading ear, spectrum on the trailing ear.
+/// Compact ears for now playing: artwork on the leading ear, spectrum (or the network speed) on the trailing ear.
 struct CompactNowPlayingView: View {
     private enum Layout {
         static let artworkSize: CGFloat = 22
@@ -9,6 +9,8 @@ struct CompactNowPlayingView: View {
     }
 
     @ObservedObject var viewModel: IslandViewModel
+    /// Set while the network speed is switched on: it takes the trailing ear in place of the spectrum.
+    var networkModel: NetworkSpeedModel?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -18,15 +20,19 @@ struct CompactNowPlayingView: View {
 
             Spacer(minLength: 0)
 
-            MusicSpectrumView(
-                isActive: viewModel.playbackState.isPlaying,
-                seed: viewModel.spectrumSeed,
-                progress: viewModel.spectrumProgress,
-                tempoBPM: viewModel.spectrumTempoBPM
-            )
-            .fixedSize()
-            .scaleEffect(Layout.spectrumScale)
-            .frame(width: IslandShapeMetrics.earWidth)
+            if let networkModel {
+                CompactNetworkStackView(model: networkModel)
+            } else {
+                MusicSpectrumView(
+                    isActive: viewModel.playbackState.isPlaying,
+                    seed: viewModel.spectrumSeed,
+                    progress: viewModel.spectrumProgress,
+                    tempoBPM: viewModel.spectrumTempoBPM
+                )
+                .fixedSize()
+                .scaleEffect(Layout.spectrumScale)
+                .frame(width: IslandShapeMetrics.earWidth)
+            }
         }
         .frame(maxHeight: .infinity)
     }

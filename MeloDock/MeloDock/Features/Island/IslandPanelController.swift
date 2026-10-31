@@ -28,7 +28,7 @@ final class IslandPanelController {
     private var pointerInside = false
 
     init(coordinator: IslandCoordinator, viewModel: IslandViewModel,
-         timerModel: TimerModel, calendarSource: CalendarActivitySource) {
+         timerModel: TimerModel, calendarSource: CalendarActivitySource, networkModel: NetworkSpeedModel) {
         self.coordinator = coordinator
         panel = IslandPanel(
             contentRect: NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height),
@@ -56,7 +56,8 @@ final class IslandPanelController {
         panel.ignoresMouseEvents = true
 
         let hostingView = NSHostingView(rootView: IslandShellView(
-            coordinator: coordinator, viewModel: viewModel, timerModel: timerModel, calendarSource: calendarSource))
+            coordinator: coordinator, viewModel: viewModel, timerModel: timerModel,
+            calendarSource: calendarSource, networkModel: networkModel))
         // The panel keeps a fixed size; the island shape animates inside it.
         hostingView.sizingOptions = []
         hostingView.frame = NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height)
