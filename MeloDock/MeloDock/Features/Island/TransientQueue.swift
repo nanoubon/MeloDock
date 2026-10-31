@@ -35,12 +35,6 @@ struct TransientQueue: Equatable {
         return true
     }
 
-    /// Restarts the clock of the current item if it is `id` and sticky (e.g. a drag that keeps producing events).
-    mutating func touch(id: String, now: Date) {
-        guard let current, current.id == id, current.sticky else { return }
-        expiresAt = now.addingTimeInterval(current.duration)
-    }
-
     /// Drops every item of `kind` (e.g. the user switched that source off). If the current item goes,
     /// the next pending one takes its place with a fresh clock.
     mutating func remove(kind: IslandActivity.Kind, now: Date) {

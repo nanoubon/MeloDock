@@ -16,6 +16,7 @@ struct IslandTransient: Identifiable, Equatable {
     let kind: IslandActivity.Kind
     let payload: Payload
     let duration: TimeInterval
-    /// Sticky items stay until the queue is touched/cleared or replaced instead of expiring on their own clock.
+    /// Marks items that are re-sent continuously (e.g. volume while dragging); a re-send replaces the current
+    /// item and restarts its clock. The queue itself treats sticky and non-sticky items alike.
     let sticky: Bool
 }

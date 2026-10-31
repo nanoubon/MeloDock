@@ -70,26 +70,6 @@ final class TransientQueueTests: XCTestCase {
         XCTAssertEqual(q.pending.map(\.id), ["p3", "p4", "p5", "p6", "p7"])
     }
 
-    func testTouchExtendsStickyItem() {
-        var q = TransientQueue()
-        q.enqueue(item("s", 2, sticky: true), now: t0)
-        q.touch(id: "s", now: t0.addingTimeInterval(1.5))
-        XCTAssertEqual(q.expiresAt, t0.addingTimeInterval(3.5))
-        XCTAssertFalse(q.tick(now: t0.addingTimeInterval(3.4)))
-        XCTAssertTrue(q.tick(now: t0.addingTimeInterval(3.5)))
-    }
-
-    func testTouchIgnoresNonStickyAndOtherIds() {
-        var q = TransientQueue()
-        q.enqueue(item("n", 2), now: t0)
-        q.touch(id: "n", now: t0.addingTimeInterval(1))
-        XCTAssertEqual(q.expiresAt, t0.addingTimeInterval(2))
-        var s = TransientQueue()
-        s.enqueue(item("s", 2, sticky: true), now: t0)
-        s.touch(id: "other", now: t0.addingTimeInterval(1))
-        XCTAssertEqual(s.expiresAt, t0.addingTimeInterval(2))
-    }
-
     func testClearDropsEverything() {
         var q = TransientQueue()
         q.enqueue(item("a"), now: t0)

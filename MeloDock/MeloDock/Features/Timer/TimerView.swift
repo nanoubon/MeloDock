@@ -11,7 +11,9 @@ struct TimerView: View {
     }
 
     @ObservedObject var model: TimerModel
+    var onTextEditingChanged: (Bool) -> Void = { _ in }
     @State private var customMinutes = ""
+    @FocusState private var minutesFocused: Bool
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -69,6 +71,9 @@ struct TimerView: View {
                     .multilineTextAlignment(.center)
                     .frame(width: 72, height: 28)
                     .background(Capsule(style: .continuous).fill(IslandTheme.chipFill))
+                    .focused($minutesFocused)
+                    .onChange(of: minutesFocused) { _, focused in onTextEditingChanged(focused) }
+                    .onDisappear { if minutesFocused { onTextEditingChanged(false) } }
                     .onSubmit(startCustom)
                     .accessibilityLabel("Custom timer minutes")
                 Button("Start", action: startCustom)
@@ -92,7 +97,9 @@ struct TimerView: View {
             Text(IslandTimeFormat.clock(remaining.rounded(.up)))
                 .font(.system(size: 36, weight: .semibold).monospacedDigit())
                 .opacity(paused ? 0.6 : 1)
-                .accessibilityLabel("\(IslandTimeFormat.clock(remaining.rounded(.up))) remaining" + (paused ? ", paused" : ""))
+                .accessibilityLabel(paused ? "Time remaining, paused" : "Time remaining")
+                .accessibilityValue(IslandTimeFormat.clock(remaining.rounded(.up)))
+                .accessibilityAddTraits(.updatesFrequently)
             ProgressBar(fraction: fraction)
                 .frame(height: Layout.progressHeight)
                 .accessibilityHidden(true)
@@ -134,7 +141,9 @@ struct TimerView: View {
             header("Stopwatch", systemImage: "stopwatch")
             Text(IslandTimeFormat.clock(elapsed))
                 .font(.system(size: 28, weight: .semibold).monospacedDigit())
-                .accessibilityLabel("Stopwatch \(IslandTimeFormat.clock(elapsed))")
+                .accessibilityLabel("Stopwatch elapsed time")
+                .accessibilityValue(IslandTimeFormat.clock(elapsed))
+                .accessibilityAddTraits(isRunning ? .updatesFrequently : [])
             HStack(spacing: 8) {
                 if isRunning {
                     Button { model.pauseStopwatch() } label: { Label("Pause", systemImage: "pause.fill") }
