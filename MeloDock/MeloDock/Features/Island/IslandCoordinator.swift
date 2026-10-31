@@ -28,6 +28,9 @@ final class IslandCoordinator: ObservableObject {
         IslandTab.page(selection: selection, tabs: tabs, requested: selectedTab)
     }
 
+    /// True while a text field in the island (the timer's custom minutes) has keyboard focus.
+    private(set) var isTextEditing = false
+
     var onExpandedChanged: ((Bool) -> Void)?
 
     var mode: IslandMode {
@@ -133,7 +136,15 @@ final class IslandCoordinator: ObservableObject {
         let wasInside = pointerInside
         pointerInside = false
         cancelHover()
-        if isExpanded && wasInside { setExpanded(false) }
+        if isExpanded && wasInside && !isTextEditing { setExpanded(false) }
+    }
+
+    /// Reported by the island's text field. Hover-exit is ignored while typing; when typing ends with
+    /// the pointer already away, the deferred collapse happens now.
+    func setTextEditing(_ editing: Bool) {
+        guard editing != isTextEditing else { return }
+        isTextEditing = editing
+        if !editing && isExpanded && !pointerInside { setExpanded(false) }
     }
 
     private func cancelHover() {
@@ -171,6 +182,7 @@ final class IslandCoordinator: ObservableObject {
     private func setExpanded(_ value: Bool) {
         guard value != isExpanded else { return }
         isExpanded = value
+        if !value { isTextEditing = false }
         selectedTab = nil
         if value { clearTransients() }
         onExpandedChanged?(value)

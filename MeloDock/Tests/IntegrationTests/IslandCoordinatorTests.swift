@@ -168,6 +168,46 @@ final class IslandCoordinatorTests: XCTestCase {
         XCTAssertEqual(c.mode, .compact)
     }
 
+    func testPointerExitDoesNotCollapseWhileTextFieldHasFocus() {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.toggleExpanded()
+        c.pointerEntered()
+        c.setTextEditing(true)
+        c.pointerExited()
+        XCTAssertTrue(c.isExpanded)
+    }
+
+    func testEndingTextEditingWithPointerOutsideCollapses() {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.toggleExpanded()
+        c.pointerEntered()
+        c.setTextEditing(true)
+        c.pointerExited()
+        c.setTextEditing(false)
+        XCTAssertFalse(c.isExpanded)
+    }
+
+    func testEndingTextEditingWithPointerInsideStaysExpanded() {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.toggleExpanded()
+        c.pointerEntered()
+        c.setTextEditing(true)
+        c.setTextEditing(false)
+        XCTAssertTrue(c.isExpanded)
+    }
+
+    func testCollapsingResetsTextEditing() {
+        let (c, s) = make()
+        s.subject.send([activity("a")])
+        c.toggleExpanded()
+        c.setTextEditing(true)
+        c.toggleExpanded()
+        XCTAssertFalse(c.isTextEditing)
+    }
+
     func testDisabledIslandNeverShowsCompact() {
         let (c, s) = make(enabled: false)
         s.subject.send([activity("a")])

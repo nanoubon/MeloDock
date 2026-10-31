@@ -40,7 +40,7 @@ struct ExpandedContainerView: View {
     @ViewBuilder
     private var page: some View {
         switch coordinator.currentPage {
-        case .timer: TimerView(model: timerModel)
+        case .timer: TimerView(model: timerModel, onTextEditingChanged: { coordinator.setTextEditing($0) })
         case .calendar: CalendarEventView(source: calendarSource)
         default: ExpandedMusicView(viewModel: viewModel)
         }

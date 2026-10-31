@@ -3,6 +3,14 @@ import Combine
 import CoreGraphics
 import SwiftUI
 
+/// Borderless non-activating panel that can take keyboard focus only when told to (see `IslandKeyPolicy`).
+/// `.nonactivatingPanel` is kept, so becoming key never activates the app or steals focus from the frontmost one.
+final class IslandPanel: NSPanel {
+    var keyAllowed = false
+    override var canBecomeKey: Bool { keyAllowed }
+    override var canBecomeMain: Bool { false }
+}
+
 /// One transparent panel anchored at the notch that hosts the island shell.
 /// Areas outside the island shape pass clicks through to the menu bar below.
 @MainActor
@@ -13,7 +21,7 @@ final class IslandPanelController {
     }
 
     private let coordinator: IslandCoordinator
-    private let panel: NSPanel
+    private let panel: IslandPanel
     private var cancellables = Set<AnyCancellable>()
     private var mouseMonitors: [Any] = []
     /// Last hover state reported to the coordinator; changes only on real mouse movement (or an exit).
@@ -22,7 +30,7 @@ final class IslandPanelController {
     init(coordinator: IslandCoordinator, viewModel: IslandViewModel,
          timerModel: TimerModel, calendarSource: CalendarActivitySource) {
         self.coordinator = coordinator
-        panel = NSPanel(
+        panel = IslandPanel(
             contentRect: NSRect(x: 0, y: 0, width: Layout.width, height: Layout.height),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -112,7 +120,8 @@ final class IslandPanelController {
 
     private func observeCoordinator() {
         // @Published emits before the property changes; hop to the main queue so `mode` is current.
-        Publishers.Merge5(
+        Publishers.Merge6(
+            coordinator.$selectedTab.map { _ in () },
             coordinator.$selection.map { _ in () },
             coordinator.$transient.map { _ in () },
             coordinator.$isExpanded.map { _ in () },
@@ -127,6 +136,11 @@ final class IslandPanelController {
     }
 
     private func updateVisibility() {
+        let keyAllowed = IslandKeyPolicy.canBecomeKey(isExpanded: coordinator.isExpanded, page: coordinator.currentPage)
+        if panel.keyAllowed != keyAllowed {
+            panel.keyAllowed = keyAllowed
+            if !keyAllowed && panel.isKeyWindow { panel.makeFirstResponder(nil) }
+        }
         let hidden = (coordinator.mode == .idle && coordinator.notch == nil)
             || (!coordinator.isIslandEnabled && !coordinator.isExpanded)
 
