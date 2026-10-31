@@ -48,6 +48,7 @@ struct CompactNetworkView: View {
 /// The trailing ear while music plays: both rates stacked, download over upload.
 struct CompactNetworkStackView: View {
     @ObservedObject var model: NetworkSpeedModel
+    var earWidth: CGFloat = IslandShapeMetrics.earWidth
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -55,7 +56,7 @@ struct CompactNetworkStackView: View {
             NetworkSpeedLabel(arrow: "↑", bytesPerSecond: model.speed.upload, fontSize: 9)
         }
         .padding(.horizontal, 4)
-        .frame(width: IslandShapeMetrics.earWidth)
+        .frame(width: earWidth)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(NetworkSpeedAccessibility.label(model.speed))
     }

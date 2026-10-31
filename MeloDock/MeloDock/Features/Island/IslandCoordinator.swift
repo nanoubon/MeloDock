@@ -38,6 +38,11 @@ final class IslandCoordinator: ObservableObject {
                   hasPrimary: selection.primary != nil, hasTransient: transient != nil)
     }
 
+    /// Ear width of the collapsed island; wider while music shares it with the network speed.
+    var compactEarWidth: CGFloat {
+        IslandShapeMetrics.compactEarWidth(primary: selection.primary, networkEnabled: enabledKinds.contains(.network))
+    }
+
     static func mode(isExpanded: Bool, enabled: Bool, hasPrimary: Bool, hasTransient: Bool) -> IslandMode {
         if isExpanded { return .expanded }
         if enabled && hasTransient { return .transient }

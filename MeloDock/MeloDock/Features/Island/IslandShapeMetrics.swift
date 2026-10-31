@@ -46,12 +46,24 @@ enum IslandShapeMetrics {
 
     /// Like `size(for:notch:)`, but a transient showing a name payload widens both ears (the shape stays centered
     /// on the notch). `transient` is ignored outside `.transient` mode.
-    static func size(for mode: IslandMode, notch: NotchGeometry?, transient: IslandTransient.Payload?) -> CGSize {
+    static func size(for mode: IslandMode, notch: NotchGeometry?, transient: IslandTransient.Payload?,
+                     compactEarWidth: CGFloat = earWidth) -> CGSize {
         var base = size(for: mode, notch: notch)
         if mode == .transient {
             base.width += 2 * (transientEarWidth(for: transient) - earWidth)
+        } else if mode == .compact, notch != nil {
+            // The pill under a notchless menu bar has a fixed width, so only the notch's ears grow.
+            base.width += 2 * (compactEarWidth - earWidth)
         }
         return base
+    }
+
+    /// Ear width while music shares the collapsed island with the network speed: the leading ear holds the artwork
+    /// and the spectrum, so both ears grow (the shape stays centered on the notch).
+    static let musicNetworkEarWidth: CGFloat = 76
+
+    static func compactEarWidth(primary: IslandActivity?, networkEnabled: Bool) -> CGFloat {
+        primary?.kind == .nowPlaying && networkEnabled ? musicNetworkEarWidth : earWidth
     }
 
     /// `size` centered horizontally on the panel and flush with its top edge (maxY).
@@ -69,9 +81,12 @@ enum IslandShapeMetrics {
     /// Where the secondary circle sits, in screen coordinates, or nil when it is not shown.
     /// It appears only beside the collapsed island (compact or transient) and only when there is a second activity.
     static func secondaryFrame(panelFrame: CGRect, mode: IslandMode, notch: NotchGeometry?,
-                               hasSecondary: Bool, transient: IslandTransient.Payload? = nil) -> CGRect? {
+                               hasSecondary: Bool, transient: IslandTransient.Payload? = nil,
+                               compactEarWidth: CGFloat = earWidth) -> CGRect? {
         guard hasSecondary, mode == .compact || mode == .transient else { return nil }
-        let island = hitRect(panelFrame: panelFrame, size: size(for: mode, notch: notch, transient: transient))
+        let island = hitRect(panelFrame: panelFrame,
+                             size: size(for: mode, notch: notch, transient: transient,
+                                        compactEarWidth: compactEarWidth))
         let diameter = secondaryCircleSize(notch: notch)
         return CGRect(x: island.maxX + secondaryGap, y: island.maxY - diameter, width: diameter, height: diameter)
     }

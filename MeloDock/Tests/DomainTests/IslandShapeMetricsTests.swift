@@ -13,6 +13,41 @@ final class IslandShapeMetricsTests: XCTestCase {
         XCTAssertEqual(IslandShapeMetrics.size(for: .compact, notch: notch), CGSize(width: 312, height: 32))
     }
 
+    func testCompactEarsAreWiderOnlyForMusicSharingWithNetwork() {
+        let playing = IslandActivity(id: "np", kind: .nowPlaying, priority: IslandActivity.Priority.nowPlayingPlaying)
+        let timer = IslandActivity(id: "timer", kind: .timer, priority: IslandActivity.Priority.timer, detail: .timer)
+        let wide = IslandShapeMetrics.musicNetworkEarWidth
+        XCTAssertEqual(IslandShapeMetrics.compactEarWidth(primary: playing, networkEnabled: true), wide)
+        XCTAssertEqual(IslandShapeMetrics.compactEarWidth(primary: playing, networkEnabled: false),
+                       IslandShapeMetrics.earWidth)
+        XCTAssertEqual(IslandShapeMetrics.compactEarWidth(primary: timer, networkEnabled: true),
+                       IslandShapeMetrics.earWidth)
+        XCTAssertEqual(IslandShapeMetrics.compactEarWidth(primary: NetworkActivitySource.activity, networkEnabled: true),
+                       IslandShapeMetrics.earWidth)
+        XCTAssertEqual(IslandShapeMetrics.compactEarWidth(primary: nil, networkEnabled: true),
+                       IslandShapeMetrics.earWidth)
+    }
+
+    func testWiderCompactEarsGrowNotchedShapeButNotThePillOrOtherModes() {
+        let wide = IslandShapeMetrics.musicNetworkEarWidth
+        let grown = IslandShapeMetrics.size(for: .compact, notch: notch, transient: nil, compactEarWidth: wide)
+        XCTAssertEqual(grown, CGSize(width: 200 + 2 * wide, height: 32))
+        XCTAssertEqual(IslandShapeMetrics.size(for: .compact, notch: nil, transient: nil, compactEarWidth: wide),
+                       IslandShapeMetrics.pillSize)
+        XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch, transient: nil, compactEarWidth: wide),
+                       IslandShapeMetrics.size(for: .expanded, notch: notch))
+        XCTAssertLessThanOrEqual(grown.width + 2 * (32 + IslandShapeMetrics.secondaryGap), IslandShapeMetrics.panelWidth)
+    }
+
+    func testSecondaryCircleFollowsTheWiderCompactIsland() {
+        let panel = CGRect(x: 436, y: 600, width: 640, height: 300)
+        let wide = IslandShapeMetrics.musicNetworkEarWidth
+        let standard = IslandShapeMetrics.secondaryFrame(panelFrame: panel, mode: .compact, notch: notch, hasSecondary: true)!
+        let grown = IslandShapeMetrics.secondaryFrame(panelFrame: panel, mode: .compact, notch: notch, hasSecondary: true,
+                                                      compactEarWidth: wide)!
+        XCTAssertEqual(grown.minX - standard.minX, wide - IslandShapeMetrics.earWidth)
+    }
+
     func testExpandedWithNotchAddsNotchHeight() {
         XCTAssertEqual(IslandShapeMetrics.size(for: .expanded, notch: notch), CGSize(width: 612, height: 252))
     }

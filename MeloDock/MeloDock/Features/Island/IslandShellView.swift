@@ -41,7 +41,8 @@ struct IslandShellView: View {
         let mode = coordinator.mode
         let isExpanded = mode == .expanded
         let size = IslandShapeMetrics.size(for: mode, notch: coordinator.notch,
-                                           transient: coordinator.transient?.payload)
+                                           transient: coordinator.transient?.payload,
+                                           compactEarWidth: coordinator.compactEarWidth)
         let shape = NotchShape(bottomRadius: bottomRadius(for: mode))
 
         ZStack(alignment: .top) {
@@ -68,6 +69,7 @@ struct IslandShellView: View {
         .overlay(alignment: .topTrailing) { secondaryCircle }
         .animation(shapeAnimation(to: mode), value: mode)
         .animation(shapeAnimation(to: mode), value: coordinator.selection.secondary?.id)
+        .animation(shapeAnimation(to: mode), value: coordinator.compactEarWidth)
         .onChange(of: mode) { _, newMode in
             previousMode = newMode
         }
@@ -83,7 +85,8 @@ struct IslandShellView: View {
         case .idle:
             EmptyView()
         case .compact:
-            let size = IslandShapeMetrics.size(for: .compact, notch: coordinator.notch)
+            let size = IslandShapeMetrics.size(for: .compact, notch: coordinator.notch, transient: nil,
+                                               compactEarWidth: coordinator.compactEarWidth)
             compactContent
                 .frame(width: size.width, height: size.height)
                 .transition(.opacity)
@@ -134,7 +137,8 @@ struct IslandShellView: View {
     private var secondaryCircle: some View {
         let hasSecondary = coordinator.selection.secondary != nil
         if IslandShapeMetrics.secondaryFrame(panelFrame: .zero, mode: coordinator.mode,
-                                             notch: coordinator.notch, hasSecondary: hasSecondary) != nil,
+                                             notch: coordinator.notch, hasSecondary: hasSecondary,
+                                             compactEarWidth: coordinator.compactEarWidth) != nil,
            let secondary = coordinator.selection.secondary {
             let diameter = IslandShapeMetrics.secondaryCircleSize(notch: coordinator.notch)
             SecondaryCircleView(activity: secondary, diameter: diameter)

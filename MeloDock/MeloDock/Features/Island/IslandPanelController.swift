@@ -208,7 +208,8 @@ final class IslandPanelController {
     /// Lets clicks through outside the current island shape and secondary circle; returns whether the cursor is inside it.
     private func refreshClickThrough() -> Bool {
         let size = IslandShapeMetrics.size(for: coordinator.mode, notch: coordinator.notch,
-                                           transient: coordinator.transient?.payload)
+                                           transient: coordinator.transient?.payload,
+                                           compactEarWidth: coordinator.compactEarWidth)
         var hitRect = IslandShapeMetrics.hitRect(panelFrame: panel.frame, size: size)
         // The cursor can sit exactly on the screen's top edge, which `contains` treats as outside.
         hitRect.size.height += 1
@@ -219,7 +220,7 @@ final class IslandPanelController {
         if var circle = IslandShapeMetrics.secondaryFrame(
             panelFrame: panel.frame, mode: coordinator.mode, notch: coordinator.notch,
             hasSecondary: coordinator.selection.secondary != nil,
-            transient: coordinator.transient?.payload) {
+            transient: coordinator.transient?.payload, compactEarWidth: coordinator.compactEarWidth) {
             circle.size.height += 1
             overCircle = circle.contains(mouse)
         }
